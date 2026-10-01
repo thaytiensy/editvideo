@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+coverage/
+.vercel/
+.vite/
+.DS_Store
+*.log
+.env*
+!.env.example
+skill_giao_duc/

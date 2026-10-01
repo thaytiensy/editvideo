@@ -1,0 +1,6 @@
+{
+  "name": "Art Video Maker PRO - Multi-Industry SaaS",
+  "description": "Multi-Industry AI Video Face-Swap SaaS with anti-abuse liveness verification, multi-industry template engine, team sharing, and dynamic branding.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
