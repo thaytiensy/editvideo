@@ -12,11 +12,7 @@ import {
   Sliders, Settings, ArrowRight, ShieldCheck, Flame, Zap
 } from 'lucide-react';
 
-interface SmartVlogStudioViewProps {
-  onSwitchToCapcut?: () => void;
-}
-
-export const SmartVlogStudioView: React.FC<SmartVlogStudioViewProps> = ({ onSwitchToCapcut }) => {
+export const SmartVlogStudioView: React.FC = () => {
   // Active industry preset
   const [selectedIndustryId, setSelectedIndustryId] = useState<string>('gia_dung');
   const activePreset = INDUSTRY_PRESETS.find(p => p.id === selectedIndustryId) || INDUSTRY_PRESETS[0];
@@ -233,7 +229,7 @@ export const SmartVlogStudioView: React.FC<SmartVlogStudioViewProps> = ({ onSwit
             </button>
           </div>
 
-          {/* Hotline & CapCut Studio Toggle */}
+          {/* Hotline & Studio Engine Status */}
           <div className="flex items-center gap-3">
             <a
               href="tel:0988658050"
@@ -243,15 +239,10 @@ export const SmartVlogStudioView: React.FC<SmartVlogStudioViewProps> = ({ onSwit
               <span>0988-658-050</span>
             </a>
 
-            {onSwitchToCapcut && (
-              <button
-                onClick={onSwitchToCapcut}
-                className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-300 text-xs font-medium transition-all"
-              >
-                <Scissors className="w-3.5 h-3.5" />
-                <span>Mở CapCut NLE Timeline</span>
-              </button>
-            )}
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Real 30FPS AI Engine</span>
+            </div>
           </div>
         </div>
       </header>

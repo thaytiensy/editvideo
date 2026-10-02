@@ -3,8 +3,6 @@ import { BrandProvider } from './context/BrandContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GeminiProvider, useGemini } from './context/GeminiContext';
 import { Navbar } from './components/layout/Navbar';
-import { CapcutStudioView } from './views/CapcutStudioView';
-import { CreateStudioView } from './views/CreateStudioView';
 import { JobsHistoryView } from './views/JobsHistoryView';
 import { TeamView } from './views/TeamView';
 import { BillingView } from './views/BillingView';
@@ -16,7 +14,7 @@ import { SmartVlogStudioView } from './views/SmartVlogStudioView';
 import { ShieldCheck, Sparkles, Zap } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, currentUser } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { isSettingsModalOpen, closeSettingsModal } = useGemini();
   const [currentTab, setCurrentTab] = useState<string>('smartvlog');
 
@@ -24,12 +22,12 @@ const AppContent: React.FC = () => {
     return <AuthView onSuccess={() => setCurrentTab('smartvlog')} />;
   }
 
-  // Tool Đa Năng AI - Smart Vlog Review Đa Ngành (Full studio mode matching template)
-  if (currentTab === 'smartvlog') {
+  // Tool Đa Năng AI - Smart Vlog Review Đa Ngành (Dedicated Studio)
+  if (currentTab === 'smartvlog' || currentTab === 'create' || currentTab === 'capcut') {
     return (
       <div className="min-h-screen bg-[#07080C] text-[#F3F4F6] flex flex-col">
         <Navbar currentTab={currentTab} onTabChange={setCurrentTab} />
-        <SmartVlogStudioView onSwitchToCapcut={() => setCurrentTab('capcut')} />
+        <SmartVlogStudioView />
         <GeminiSettingsModal
           isOpen={isSettingsModalOpen}
           onClose={closeSettingsModal}
@@ -38,25 +36,19 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // CapCut Pro Desktop Studio View (Full viewport mode)
-  if (currentTab === 'capcut') {
-    return <CapcutStudioView onSwitchView={() => setCurrentTab('smartvlog')} />;
-  }
-
   return (
     <div className="min-h-screen bg-[#090A0F] text-[#F3F4F6] flex flex-col">
-      {/* Top Navbar adhering to 3-zone contract */}
+      {/* Top Navbar */}
       <Navbar currentTab={currentTab} onTabChange={setCurrentTab} />
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
-        {currentTab === 'create' && <CreateStudioView />}
-        {currentTab === 'jobs' && <JobsHistoryView onNavigateCreate={() => setCurrentTab('capcut')} />}
+        {currentTab === 'jobs' && <JobsHistoryView onNavigateCreate={() => setCurrentTab('smartvlog')} />}
         {currentTab === 'team' && <TeamView />}
         {currentTab === 'billing' && <BillingView />}
         {currentTab === 'settings' && <SettingsView />}
         {currentTab.startsWith('admin') && (
-          <AdminLayout onBackToStudio={() => setCurrentTab('capcut')} />
+          <AdminLayout onBackToStudio={() => setCurrentTab('smartvlog')} />
         )}
       </main>
 
@@ -70,9 +62,9 @@ const AppContent: React.FC = () => {
       <footer className="border-t border-neutral-800/80 bg-[#090A0F] py-6 px-6 mt-auto text-xs text-neutral-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-neutral-400">Art Video Maker PRO</span>
+            <span className="font-semibold text-neutral-400">TOOL ĐA NĂNG AI</span>
             <span>·</span>
-            <span>Multi-Industry AI Face-Swap SaaS (PRO UNLIMITED)</span>
+            <span>Review Đa Ngành Nghề (1 Tool Làm Tất Cả)</span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px] flex-wrap justify-center">
@@ -86,9 +78,7 @@ const AppContent: React.FC = () => {
               <span>Admin: thaytiensy@gmail.com</span>
             </span>
             <span>·</span>
-            <span>Real AI Video & Image Engine</span>
-            <span>·</span>
-            <span>Auto Face Tracking 100% Client-Side</span>
+            <span>Client-Side Real 30fps Canvas Engine</span>
           </div>
         </div>
       </footer>

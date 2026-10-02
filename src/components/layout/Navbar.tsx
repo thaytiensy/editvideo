@@ -3,8 +3,8 @@ import { useBrand } from '../../context/BrandContext';
 import { useAuth } from '../../context/AuthContext';
 import { useGemini } from '../../context/GeminiContext';
 import { 
-  Shield, Sparkles, User, Video, Users, CreditCard, Settings, 
-  ChevronDown, Check, Key, Cpu, Zap, Flame 
+  Shield, Sparkles, Users, Settings, 
+  ChevronDown, Check, Key, Zap, Flame, Film 
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -24,87 +24,89 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
         {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-6">
           <button
-            onClick={() => onTabChange('create')}
+            onClick={() => onTabChange('smartvlog')}
             className="text-lg font-bold tracking-tight text-white hover:opacity-90 transition-opacity whitespace-nowrap flex items-center gap-2"
           >
-            <span>{appName}</span>
-            <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-mono font-bold tracking-wider">
+            <span className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-transparent font-extrabold">
+              {appName || 'TOOL ĐA NĂNG AI'}
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-mono font-bold tracking-wider">
               PRO UNLIMITED
             </span>
           </button>
         </div>
 
         {/* Zone 2: Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-4 text-xs font-medium text-neutral-400">
+        <nav className="hidden lg:flex items-center gap-3 text-xs font-medium text-neutral-400">
           <button
             onClick={() => onTabChange('smartvlog')}
-            className={`transition-all whitespace-nowrap flex items-center gap-1.5 px-3 py-1 rounded-lg ${
-              currentTab === 'smartvlog'
+            className={`transition-all whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
+              currentTab === 'smartvlog' || currentTab === 'create' || currentTab === 'capcut'
                 ? 'bg-gradient-to-r from-amber-500/25 via-yellow-500/20 to-amber-600/25 text-amber-300 font-extrabold border border-amber-500/50 shadow-sm shadow-amber-500/20'
                 : 'text-amber-300/90 hover:text-amber-200 bg-[#171B2B] border border-amber-500/30 hover:border-amber-400'
             }`}
           >
             <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span>Tool Đa Năng AI (Review Đa Ngành)</span>
-            <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-black tracking-wider animate-pulse">BIG UPDATE</span>
+            <span>Studio Review Đa Ngành</span>
+            <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-black tracking-wider animate-pulse">
+              1 TOOL LÀM TẤT CẢ
+            </span>
           </button>
-          <button
-            onClick={() => onTabChange('capcut')}
-            className={`transition-colors whitespace-nowrap flex items-center gap-1.5 px-3 py-1 rounded-lg ${
-              currentTab === 'capcut'
-                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 font-bold border border-indigo-500/30'
-                : 'text-neutral-300 hover:text-white bg-[#151722] border border-[#232532]'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span>CapCut Studio PRO (3 Vùng)</span>
-          </button>
-          <button
-            onClick={() => onTabChange('create')}
-            className={`transition-colors whitespace-nowrap ${
-              currentTab === 'create' ? 'text-white font-semibold' : 'hover:text-neutral-200'
-            }`}
-          >
-            Studio Ghép Mặt Web
-          </button>
+
           <button
             onClick={() => onTabChange('jobs')}
-            className={`transition-colors whitespace-nowrap ${
-              currentTab === 'jobs' ? 'text-white font-semibold' : 'hover:text-neutral-200'
+            className={`transition-colors whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
+              currentTab === 'jobs' 
+                ? 'text-white font-semibold bg-neutral-800/80 border border-neutral-700' 
+                : 'hover:text-neutral-200'
             }`}
           >
-            Video Đã Xuất
+            <Film className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Video Đã Xuất</span>
           </button>
+
           <button
             onClick={() => onTabChange('team')}
-            className={`transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-              currentTab === 'team' ? 'text-white font-semibold' : 'hover:text-neutral-200'
+            className={`transition-colors whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
+              currentTab === 'team' 
+                ? 'text-white font-semibold bg-neutral-800/80 border border-neutral-700' 
+                : 'hover:text-neutral-200'
             }`}
           >
             <Users className="w-3.5 h-3.5 text-indigo-400" />
             <span>Phân Quyền Gmail</span>
           </button>
+
           <button
             onClick={() => onTabChange('billing')}
-            className={`transition-colors whitespace-nowrap ${
-              currentTab === 'billing' ? 'text-white font-semibold' : 'hover:text-neutral-200'
+            className={`transition-colors whitespace-nowrap px-3 py-1.5 rounded-lg ${
+              currentTab === 'billing' 
+                ? 'text-white font-semibold bg-neutral-800/80 border border-neutral-700' 
+                : 'hover:text-neutral-200'
             }`}
           >
             Bảng Giá (PRO)
           </button>
+
           <button
             onClick={() => onTabChange('settings')}
-            className={`transition-colors whitespace-nowrap ${
-              currentTab === 'settings' ? 'text-white font-semibold' : 'hover:text-neutral-200'
+            className={`transition-colors whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-lg ${
+              currentTab === 'settings' 
+                ? 'text-white font-semibold bg-neutral-800/80 border border-neutral-700' 
+                : 'hover:text-neutral-200'
             }`}
           >
-            Cài Đặt
+            <Settings className="w-3.5 h-3.5 text-neutral-400" />
+            <span>Cài Đặt</span>
           </button>
+
           {isAdmin && (
             <button
               onClick={() => onTabChange('admin')}
-              className={`transition-colors whitespace-nowrap flex items-center gap-1 ${
-                currentTab.startsWith('admin') ? 'text-indigo-400 font-semibold' : 'text-neutral-400 hover:text-indigo-300'
+              className={`transition-colors whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-lg ${
+                currentTab.startsWith('admin') 
+                  ? 'text-indigo-400 font-semibold bg-indigo-500/10 border border-indigo-500/30' 
+                  : 'text-neutral-400 hover:text-indigo-300'
               }`}
             >
               <Shield className="w-3.5 h-3.5" />
@@ -113,7 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
           )}
         </nav>
 
-        {/* Zone 3: Actions & Unlocked Settings Button */}
+        {/* Zone 3: Actions & Quick User Switcher */}
         <div className="flex items-center gap-2.5 sm:gap-3">
           {/* Optional AI Settings Button - No Lock */}
           <button
@@ -147,7 +149,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
               <div className="absolute right-0 mt-2 w-72 bg-[#111420] border border-neutral-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
                 <div className="px-2 py-1.5 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider border-b border-neutral-800/80 mb-1 flex items-center justify-between">
                   <span>Chuyển đổi tài khoản:</span>
-                  <span className="text-indigo-400">PRO Mode</span>
+                  <span className="text-indigo-400 font-mono">PRO Mode</span>
                 </div>
                 {allUsers.map((u) => (
                   <button
@@ -182,11 +184,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
 
           {/* CTA Create Button */}
           <button
-            onClick={() => onTabChange('create')}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-colors whitespace-nowrap shadow-sm shadow-indigo-600/20 flex items-center gap-1.5"
+            onClick={() => onTabChange('smartvlog')}
+            className="px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 rounded-xl transition-all whitespace-nowrap shadow-sm shadow-amber-600/20 flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tạo Video</span>
+            <span className="font-bold">Vào Studio</span>
           </button>
         </div>
       </div>
@@ -194,10 +196,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
       {/* Mobile Submenu for tabs */}
       <div className="flex lg:hidden items-center gap-2 overflow-x-auto pt-2.5 border-t border-neutral-800/60 mt-2 text-xs">
         <button
-          onClick={() => onTabChange('create')}
-          className={`px-2.5 py-1 rounded-lg whitespace-nowrap ${currentTab === 'create' ? 'bg-indigo-600 text-white font-semibold' : 'text-neutral-400'}`}
+          onClick={() => onTabChange('smartvlog')}
+          className={`px-3 py-1 rounded-lg whitespace-nowrap flex items-center gap-1 ${
+            currentTab === 'smartvlog' ? 'bg-amber-600 text-white font-bold' : 'text-neutral-400'
+          }`}
         >
-          Studio Ghép Mặt
+          <Flame className="w-3 h-3 text-amber-300" />
+          <span>Studio AI</span>
         </button>
         <button
           onClick={() => onTabChange('jobs')}
