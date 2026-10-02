@@ -1,0 +1,37 @@
+# Node & Next.js
+node_modules/
+.next/
+dist/
+out/
+build/
+.turbo/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+
+# Models & Heavy Weights (Download via script)
+models/*.onnx
+models/*.pt
+models/*.pth
+models/*.bin
+!models/.gitkeep
+
+# Storage & Temporary Files
+uploads/
+exports/
+temp/
+*.log
+.DS_Store
+
+# Environment & Secrets
+.env
+.env.local
+.env.production

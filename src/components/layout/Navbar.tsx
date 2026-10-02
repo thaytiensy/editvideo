@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useGemini } from '../../context/GeminiContext';
 import { 
   Shield, Sparkles, User, Video, Users, CreditCard, Settings, 
-  ChevronDown, Check, Key, Cpu, Zap 
+  ChevronDown, Check, Key, Cpu, Zap, Flame 
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -35,7 +35,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
         </div>
 
         {/* Zone 2: Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-neutral-400">
+        <nav className="hidden lg:flex items-center gap-4 text-xs font-medium text-neutral-400">
+          <button
+            onClick={() => onTabChange('smartvlog')}
+            className={`transition-all whitespace-nowrap flex items-center gap-1.5 px-3 py-1 rounded-lg ${
+              currentTab === 'smartvlog'
+                ? 'bg-gradient-to-r from-amber-500/25 via-yellow-500/20 to-amber-600/25 text-amber-300 font-extrabold border border-amber-500/50 shadow-sm shadow-amber-500/20'
+                : 'text-amber-300/90 hover:text-amber-200 bg-[#171B2B] border border-amber-500/30 hover:border-amber-400'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span>Tool Đa Năng AI (Review Đa Ngành)</span>
+            <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-black tracking-wider animate-pulse">BIG UPDATE</span>
+          </button>
           <button
             onClick={() => onTabChange('capcut')}
             className={`transition-colors whitespace-nowrap flex items-center gap-1.5 px-3 py-1 rounded-lg ${

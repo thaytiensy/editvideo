@@ -12,20 +12,35 @@ import { SettingsView } from './views/SettingsView';
 import { AdminLayout } from './views/admin/AdminLayout';
 import { AuthView } from './views/AuthView';
 import { GeminiSettingsModal } from './components/gemini/GeminiSettingsModal';
+import { SmartVlogStudioView } from './views/SmartVlogStudioView';
 import { ShieldCheck, Sparkles, Zap } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, currentUser } = useAuth();
   const { isSettingsModalOpen, closeSettingsModal } = useGemini();
-  const [currentTab, setCurrentTab] = useState<string>('capcut');
+  const [currentTab, setCurrentTab] = useState<string>('smartvlog');
 
   if (!isAuthenticated) {
-    return <AuthView onSuccess={() => setCurrentTab('capcut')} />;
+    return <AuthView onSuccess={() => setCurrentTab('smartvlog')} />;
+  }
+
+  // Tool Đa Năng AI - Smart Vlog Review Đa Ngành (Full studio mode matching template)
+  if (currentTab === 'smartvlog') {
+    return (
+      <div className="min-h-screen bg-[#07080C] text-[#F3F4F6] flex flex-col">
+        <Navbar currentTab={currentTab} onTabChange={setCurrentTab} />
+        <SmartVlogStudioView onSwitchToCapcut={() => setCurrentTab('capcut')} />
+        <GeminiSettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={closeSettingsModal}
+        />
+      </div>
+    );
   }
 
   // CapCut Pro Desktop Studio View (Full viewport mode)
   if (currentTab === 'capcut') {
-    return <CapcutStudioView onSwitchView={() => setCurrentTab('create')} />;
+    return <CapcutStudioView onSwitchView={() => setCurrentTab('smartvlog')} />;
   }
 
   return (

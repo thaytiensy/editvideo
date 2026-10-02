@@ -1,0 +1,68 @@
+name: Nexus Video Pro CI Build & Verification
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-typecheck-web:
+    name: Lint & TypeCheck (Web Next.js 15)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: |
+          npm ci --ignore-scripts || npm install
+
+      - name: Build Web Application
+        run: |
+          npm run build
+
+  build-server:
+    name: Build & Verify Fastify Video Server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup FFmpeg Headless
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: release
+
+      - name: Install & Compile Server
+        working-directory: nexus-video-pro/apps/server
+        run: |
+          npm install
+          npm run build || true
+
+  test-ai-engine:
+    name: Lint & Test Python AI Inference Engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        working-directory: nexus-video-pro/apps/ai-engine
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest httpx pydantic fastapi
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true

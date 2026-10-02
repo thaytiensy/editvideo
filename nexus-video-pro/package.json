@@ -1,0 +1,33 @@
+{
+  "name": "nexus-video-pro-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-Grade AI Video Studio & Non-Linear Video Editor (NLE)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:server": "npm run dev --workspace=apps/server",
+    "dev:ai": "cd apps/ai-engine && python main.py",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:server": "npm run build --workspace=apps/server",
+    "build": "npm run build:web && npm run build:server"
+  },
+  "keywords": [
+    "video-editor",
+    "nle",
+    "ai-video",
+    "face-swap",
+    "insightface",
+    "sam2",
+    "webcodecs",
+    "remotion",
+    "wan2.1",
+    "kling",
+    "fastify",
+    "bullmq"
+  ],
+  "author": "Nexus Video Pro Architecture Team & Thầy Tiến Sỹ <thaytiensy@gmail.com>",
+  "license": "MIT"
+}

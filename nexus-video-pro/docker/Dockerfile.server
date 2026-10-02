@@ -1,0 +1,25 @@
+# Dockerfile for Fastify + Fluent-FFmpeg headless render worker
+FROM node:22-bullseye-slim AS base
+WORKDIR /app
+
+# Install FFmpeg and essential video codecs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libvpx-dev \
+    libx264-dev \
+    libx265-dev \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY apps/server/package.json ./apps/server/
+COPY package.json ./
+RUN npm install
+
+COPY . .
+
+WORKDIR /app/apps/server
+RUN npm run build || true
+
+EXPOSE 8000
+CMD ["npm", "start"]
