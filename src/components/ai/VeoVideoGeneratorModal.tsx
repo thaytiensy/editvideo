@@ -59,11 +59,14 @@ export const VeoVideoGeneratorModal: React.FC<VeoVideoGeneratorModalProps> = ({
           file_id: `veo3-${Date.now()}`,
           filename: `veo3_cinematic_${Date.now()}.mp4`,
           file_path: sampleResultUrl,
+          url: sampleResultUrl,
           type: 'video',
           duration: 10,
           fps: 30,
+          frame_count: 300,
           width: aspectRatio === '16:9' ? 1920 : 1080,
           height: aspectRatio === '16:9' ? 1080 : 1920,
+          thumbnail: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
         };
         onVideoCreated(newMedia);
       }

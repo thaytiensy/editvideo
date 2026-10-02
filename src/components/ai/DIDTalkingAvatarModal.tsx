@@ -67,12 +67,14 @@ export const DIDTalkingAvatarModal: React.FC<DIDTalkingAvatarModalProps> = ({
             file_id: `did-${Date.now()}`,
             filename: `did_avatar_${Date.now()}.mp4`,
             file_path: data.result_url,
+            url: data.result_url,
             type: 'video',
             duration: 8,
             fps: 30,
+            frame_count: 240,
             width: 720,
             height: 1280,
-            thumbnail: sourceFaceCrop || undefined
+            thumbnail: sourceFaceCrop || ''
           };
           onVideoCreated(newMedia);
         }
