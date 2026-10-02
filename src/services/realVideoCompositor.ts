@@ -383,24 +383,72 @@ export class RealVideoCompositor {
     };
 
     const completionPromise = new Promise<Blob>((resolve) => {
+      let done = false;
+      const timeout = setTimeout(() => {
+        if (!done) {
+          done = true;
+          const finalType = chosenMime || 'video/webm';
+          resolve(new Blob(recordedChunks, { type: finalType }));
+        }
+      }, (duration + 6) * 1000);
+
       recorder.onstop = () => {
-        const finalType = chosenMime || 'video/webm';
-        resolve(new Blob(recordedChunks, { type: finalType }));
+        if (!done) {
+          done = true;
+          clearTimeout(timeout);
+          const finalType = chosenMime || 'video/webm';
+          resolve(new Blob(recordedChunks, { type: finalType }));
+        }
+      };
+
+      recorder.onerror = () => {
+        if (!done) {
+          done = true;
+          clearTimeout(timeout);
+          const finalType = chosenMime || 'video/webm';
+          resolve(new Blob(recordedChunks, { type: finalType }));
+        }
       };
     });
 
     recorder.start(100);
 
     video.currentTime = 0;
-    await video.play();
+    try {
+      await video.play();
+    } catch {}
 
     let isFinished = false;
+    let lastTime = -1;
+    let stallCount = 0;
 
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
+      const hardVideoTimeout = setTimeout(() => {
+        if (!isFinished) {
+          isFinished = true;
+          try { video.pause(); } catch {}
+          resolve();
+        }
+      }, (duration + 4) * 1000);
+
       const checkFrame = async () => {
         if (isFinished) return;
 
         const current = video.currentTime;
+
+        // Detect video playback stall
+        if (Math.abs(current - lastTime) < 0.001) {
+          stallCount++;
+          if (stallCount > 50) {
+            // Video stalled for >1.5s, force advance
+            video.currentTime = Math.min(duration, current + 0.1);
+            stallCount = 0;
+          }
+        } else {
+          stallCount = 0;
+          lastTime = current;
+        }
+
         const progress = Math.min(98, Math.round((current / Math.max(duration, 0.1)) * 80) + 15);
 
         if (onProgress) {
@@ -412,11 +460,16 @@ export class RealVideoCompositor {
           );
         }
 
-        await this.renderPreviewFrame(canvas, video, faceImages, faces, watermarkText, autoTrack);
+        try {
+          await this.renderPreviewFrame(canvas, video, faceImages, faces, watermarkText, autoTrack);
+        } catch (err) {
+          console.warn('Frame render error, continuing:', err);
+        }
 
         if (current >= duration || video.ended) {
           isFinished = true;
-          video.pause();
+          clearTimeout(hardVideoTimeout);
+          try { video.pause(); } catch {}
           resolve();
           return;
         }
@@ -426,7 +479,9 @@ export class RealVideoCompositor {
 
       video.onerror = () => {
         isFinished = true;
-        reject(new Error('Lỗi trong quá trình render video frame'));
+        clearTimeout(hardVideoTimeout);
+        try { video.pause(); } catch {}
+        resolve();
       };
 
       requestAnimationFrame(checkFrame);
@@ -512,8 +567,28 @@ export class RealVideoCompositor {
     };
 
     const completionPromise = new Promise<Blob>((resolve) => {
+      let done = false;
+      const timeout = setTimeout(() => {
+        if (!done) {
+          done = true;
+          resolve(new Blob(chunks, { type: chosenMime || 'video/webm' }));
+        }
+      }, (duration + 6) * 1000);
+
       recorder.onstop = () => {
-        resolve(new Blob(chunks, { type: chosenMime || 'video/webm' }));
+        if (!done) {
+          done = true;
+          clearTimeout(timeout);
+          resolve(new Blob(chunks, { type: chosenMime || 'video/webm' }));
+        }
+      };
+
+      recorder.onerror = () => {
+        if (!done) {
+          done = true;
+          clearTimeout(timeout);
+          resolve(new Blob(chunks, { type: chosenMime || 'video/webm' }));
+        }
       };
     });
 

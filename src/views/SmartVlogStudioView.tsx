@@ -637,9 +637,20 @@ export const SmartVlogStudioView: React.FC<SmartVlogStudioViewProps> = ({ onSwit
 
                 {isBatchRendering && (
                   <div className="p-2.5 bg-[#141829] rounded-xl border border-emerald-500/30 space-y-1.5 text-[11px]">
-                    <div className="flex justify-between text-neutral-300">
+                    <div className="flex justify-between items-center text-neutral-300">
                       <span className="truncate pr-2">{batchProgress.message}</span>
-                      <span className="font-mono text-emerald-400 font-bold">{batchProgress.percent}%</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-emerald-400 font-bold">{batchProgress.percent}%</span>
+                        <button
+                          onClick={() => {
+                            setIsBatchRendering(false);
+                            setBatchProgress({ percent: 0, message: 'Đã dừng tiến trình xuất video.' });
+                          }}
+                          className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-colors"
+                        >
+                          Hủy
+                        </button>
+                      </div>
                     </div>
                     <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
                       <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${batchProgress.percent}%` }} />
