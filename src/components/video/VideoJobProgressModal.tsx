@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, AlertTriangle, Download, Share2, X, RefreshCw, Sparkles, Shield, Cpu, Mail } from 'lucide-react';
 import { VideoJob } from '../../types';
 import { videoPipeline } from '../../services/videoPipeline';
+import { downloadVideoFile } from '../../services/videoDownloader';
 import confetti from 'canvas-confetti';
 
 interface VideoJobProgressModalProps {
@@ -184,15 +185,13 @@ export const VideoJobProgressModal: React.FC<VideoJobProgressModalProps> = ({
             </div>
 
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 pt-2">
-              <a
-                href={finalUrl}
-                download={job.templateTitle ? `${job.templateTitle.replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, '_')}.mp4` : 'art_video_render.mp4'}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-600/20 whitespace-nowrap"
+              <button
+                type="button"
+                onClick={() => downloadVideoFile(finalUrl, job.templateTitle || 'video_render')}
+                className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-600/20 whitespace-nowrap"
               >
-                <Download className="w-4 h-4" /> Tải Video Về Máy
-              </a>
+                <Download className="w-4 h-4" /> Tải Video Về Máy (.mp4)
+              </button>
               <button
                 type="button"
                 onClick={handleShareGmail}

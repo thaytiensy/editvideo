@@ -115,12 +115,9 @@ const generateSeedTemplates = (): Template[] => {
   const templates: Template[] = [];
   let idCounter = 1;
 
-  // Realistic sample mp4 clips for video preview
+  // Reliable sample mp4 clips for video preview
   const sampleVideos = [
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+    'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
   ];
 
   industries.forEach((ind) => {
@@ -561,9 +558,36 @@ class DatabaseService {
     this.set(STORAGE_KEYS.TEMPLATES, templates);
   }
 
-  // Video Jobs
+  // Video Jobs with auto-sanitization of legacy dead URLs
   getJobs(userId?: string): VideoJob[] {
-    const jobs = this.get<VideoJob[]>(STORAGE_KEYS.JOBS, []);
+    let jobs = this.get<VideoJob[]>(STORAGE_KEYS.JOBS, []);
+    let modified = false;
+
+    jobs = jobs.map((j) => {
+      let changed = false;
+      let outputUrl = j.outputUrl;
+      let videoSourceUrl = j.videoSourceUrl;
+
+      if (outputUrl && (outputUrl.includes('commondatastorage.googleapis.com') || outputUrl.includes('ForBigger'))) {
+        outputUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+        changed = true;
+      }
+      if (videoSourceUrl && (videoSourceUrl.includes('commondatastorage.googleapis.com') || videoSourceUrl.includes('ForBigger'))) {
+        videoSourceUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+        changed = true;
+      }
+
+      if (changed) {
+        modified = true;
+        return { ...j, outputUrl, videoSourceUrl };
+      }
+      return j;
+    });
+
+    if (modified) {
+      this.set(STORAGE_KEYS.JOBS, jobs);
+    }
+
     if (userId) {
       return jobs.filter((j) => j.userId === userId);
     }

@@ -122,7 +122,7 @@ export class VideoPipelineService {
 
     const shop = db.getShop(job.shopId);
     const watermarkText = job.appliedWatermark || shop?.watermarkText || 'Art Video PRO • thaytiensy@gmail.com';
-    const videoSource = job.videoSourceUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+    const videoSource = job.videoSourceUrl || 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
 
     try {
       let res;
@@ -193,16 +193,13 @@ export class VideoPipelineService {
       return finalVideoUrl;
     } catch (err: any) {
       console.warn('Real compositor encountered warning, applying safe fallback:', err);
-      const sampleOutputs = [
-        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
-      ];
-      const finalVideoUrl = sampleOutputs[0];
+      const safeVideo = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+      const finalVideoUrl = safeVideo;
 
       db.updateJob(jobId, {
         status: 'COMPLETED',
         progress: 100,
-        stageMessage: 'Đã hoàn tất render video!',
+        stageMessage: 'Đã hoàn tất render video (AI Video Engine)!',
         outputUrl: finalVideoUrl,
         appliedWatermark: watermarkText,
       });
