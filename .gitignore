@@ -9,3 +9,11 @@ coverage/
 .env*
 !.env.example
 skill_giao_duc/
+src-tauri/target/
+uploads/
+exports/
+venv/
+tools/
+models/
+__pycache__/
+*.pyc

@@ -37,12 +37,23 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
         {/* Zone 2: Navigation Links */}
         <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-neutral-400">
           <button
+            onClick={() => onTabChange('capcut')}
+            className={`transition-colors whitespace-nowrap flex items-center gap-1.5 px-3 py-1 rounded-lg ${
+              currentTab === 'capcut'
+                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 font-bold border border-indigo-500/30'
+                : 'text-neutral-300 hover:text-white bg-[#151722] border border-[#232532]'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>CapCut Studio PRO (3 Vùng)</span>
+          </button>
+          <button
             onClick={() => onTabChange('create')}
             className={`transition-colors whitespace-nowrap ${
               currentTab === 'create' ? 'text-white font-semibold' : 'hover:text-neutral-200'
             }`}
           >
-            Studio Ghép Mặt
+            Studio Ghép Mặt Web
           </button>
           <button
             onClick={() => onTabChange('jobs')}

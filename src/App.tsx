@@ -3,6 +3,7 @@ import { BrandProvider } from './context/BrandContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GeminiProvider, useGemini } from './context/GeminiContext';
 import { Navbar } from './components/layout/Navbar';
+import { CapcutStudioView } from './views/CapcutStudioView';
 import { CreateStudioView } from './views/CreateStudioView';
 import { JobsHistoryView } from './views/JobsHistoryView';
 import { TeamView } from './views/TeamView';
@@ -16,10 +17,15 @@ import { ShieldCheck, Sparkles, Zap } from 'lucide-react';
 const AppContent: React.FC = () => {
   const { isAuthenticated, currentUser } = useAuth();
   const { isSettingsModalOpen, closeSettingsModal } = useGemini();
-  const [currentTab, setCurrentTab] = useState<string>('create');
+  const [currentTab, setCurrentTab] = useState<string>('capcut');
 
   if (!isAuthenticated) {
-    return <AuthView onSuccess={() => setCurrentTab('create')} />;
+    return <AuthView onSuccess={() => setCurrentTab('capcut')} />;
+  }
+
+  // CapCut Pro Desktop Studio View (Full viewport mode)
+  if (currentTab === 'capcut') {
+    return <CapcutStudioView onSwitchView={() => setCurrentTab('create')} />;
   }
 
   return (
@@ -30,12 +36,12 @@ const AppContent: React.FC = () => {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         {currentTab === 'create' && <CreateStudioView />}
-        {currentTab === 'jobs' && <JobsHistoryView onNavigateCreate={() => setCurrentTab('create')} />}
+        {currentTab === 'jobs' && <JobsHistoryView onNavigateCreate={() => setCurrentTab('capcut')} />}
         {currentTab === 'team' && <TeamView />}
         {currentTab === 'billing' && <BillingView />}
         {currentTab === 'settings' && <SettingsView />}
         {currentTab.startsWith('admin') && (
-          <AdminLayout onBackToStudio={() => setCurrentTab('create')} />
+          <AdminLayout onBackToStudio={() => setCurrentTab('capcut')} />
         )}
       </main>
 
