@@ -156,3 +156,23 @@ export interface PricingConfig {
   features: string[];
   recommended?: boolean;
 }
+
+export type LicenseStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+export type LicensePlan = 'LIFETIME' | '1_YEAR' | '1_MONTH' | 'TRIAL';
+
+export interface AppLicense {
+  id: string;
+  licenseKey: string;
+  customerName: string;
+  customerContact: string; // SĐT hoặc Gmail
+  plan: LicensePlan;
+  status: LicenseStatus;
+  maxDevices: number;
+  boundMachineId?: string;
+  boundMachineName?: string;
+  activatedAt?: string;
+  expiresAt: string; // ISO String hoặc 'NEVER'
+  createdAt: string;
+  notes?: string;
+}
+

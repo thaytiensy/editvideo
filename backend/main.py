@@ -616,6 +616,282 @@ def download_export(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(target), media_type="video/mp4", filename=filename)
 
+# ==========================================================
+# MODULE BÁN APP & LICENSE (SY-XXXX-XXXX)
+# ==========================================================
+LICENSES_FILE = BASE_DIR / "backend" / "licenses.json"
+ADMIN_AUTH_FILE = BASE_DIR / "backend" / "admin_auth.json"
+
+def get_admin_passwords() -> Dict[str, str]:
+    if ADMIN_AUTH_FILE.exists():
+        try:
+            with open(ADMIN_AUTH_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"admin": "123456", "thaytiensy@gmail.com": "12345678"}
+
+def save_admin_passwords(data: Dict[str, str]):
+    with open(ADMIN_AUTH_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def load_licenses_db() -> List[Dict[str, Any]]:
+    if LICENSES_FILE.exists():
+        try:
+            with open(LICENSES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # Initial seeds
+    initial = [
+        {
+            "id": "lic-sy-001",
+            "email_or_phone": "thaytiensy@gmail.com",
+            "license_key": "SY-VIP9-9999",
+            "plan": "LIFETIME",
+            "is_active": True,
+            "expires_at": "NEVER",
+            "created_at": "2026-01-01T00:00:00Z"
+        },
+        {
+            "id": "lic-sy-002",
+            "email_or_phone": "admin",
+            "license_key": "SY-PRO8-8888",
+            "plan": "LIFETIME",
+            "is_active": True,
+            "expires_at": "NEVER",
+            "created_at": "2026-01-01T00:00:00Z"
+        },
+        {
+            "id": "lic-sy-003",
+            "email_or_phone": "khachhang@gmail.com",
+            "license_key": "SY-DEMO-30DY",
+            "plan": "1_MONTH",
+            "is_active": True,
+            "expires_at": "2026-11-02T18:00:00Z",
+            "created_at": "2026-10-02T18:00:00Z"
+        }
+    ]
+    save_licenses_db(initial)
+    return initial
+
+def save_licenses_db(lics: List[Dict[str, Any]]):
+    with open(LICENSES_FILE, "w", encoding="utf-8") as f:
+        json.dump(lics, f, indent=2, ensure_ascii=False)
+
+def generate_sy_key() -> str:
+    part1 = uuid.uuid4().hex[:4].upper()
+    part2 = uuid.uuid4().hex[:4].upper()
+    return f"SY-{part1}-{part2}"
+
+class CreateLicenseRequest(BaseModel):
+    email_or_phone: str
+    plan: Optional[str] = "1_MONTH" # 1_MONTH, 1_YEAR, LIFETIME, PRO
+    duration_days: Optional[int] = 30
+    notes: Optional[str] = ""
+
+class ToggleLicenseRequest(BaseModel):
+    license_key: str
+
+class ActivateLicenseRequest(BaseModel):
+    license_key: str
+    email_or_phone: Optional[str] = None
+
+class ChangePasswordRequest(BaseModel):
+    username: str
+    old_password: str
+    new_password: str
+
+@app.get("/admin/licenses")
+def get_all_licenses():
+    return load_licenses_db()
+
+@app.post("/admin/licenses/create")
+def create_license(req: CreateLicenseRequest):
+    lics = load_licenses_db()
+    key = generate_sy_key()
+    
+    expires_at = "NEVER"
+    if req.plan != "LIFETIME":
+        days = req.duration_days or (365 if req.plan == "1_YEAR" else 30)
+        from datetime import datetime, timedelta, timezone
+        exp_dt = datetime.now(timezone.utc) + timedelta(days=days)
+        expires_at = exp_dt.isoformat()
+
+    from datetime import datetime, timezone
+    new_lic = {
+        "id": f"lic-{uuid.uuid4().hex[:8]}",
+        "email_or_phone": req.email_or_phone.strip(),
+        "license_key": key,
+        "plan": req.plan or "1_MONTH",
+        "is_active": True,
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "notes": req.notes or ""
+    }
+    lics.insert(0, new_lic)
+    save_licenses_db(lics)
+    return new_lic
+
+@app.post("/admin/licenses/toggle")
+def toggle_license(req: ToggleLicenseRequest):
+    lics = load_licenses_db()
+    for lic in lics:
+        if lic["license_key"].upper() == req.license_key.strip().upper():
+            lic["is_active"] = not lic["is_active"]
+            save_licenses_db(lics)
+            return {"success": True, "license": lic}
+    raise HTTPException(status_code=404, detail="Không tìm thấy License Key")
+
+@app.post("/admin/licenses/revoke")
+def revoke_license(req: ToggleLicenseRequest):
+    lics = load_licenses_db()
+    for lic in lics:
+        if lic["license_key"].upper() == req.license_key.strip().upper():
+            lic["is_active"] = False
+            save_licenses_db(lics)
+            return {"success": True, "message": "Đã thu hồi bản quyền thành công", "license": lic}
+    raise HTTPException(status_code=404, detail="Không tìm thấy License Key")
+
+@app.post("/auth/activate")
+def activate_license(req: ActivateLicenseRequest):
+    lics = load_licenses_db()
+    target_key = req.license_key.strip().upper()
+    
+    for lic in lics:
+        if lic["license_key"].upper() == target_key:
+            if not lic["is_active"]:
+                raise HTTPException(status_code=403, detail="License này đã bị vô hiệu hóa hoặc thu hồi bởi Quản trị viên.")
+            
+            # Check expiration
+            if lic["expires_at"] != "NEVER":
+                from datetime import datetime, timezone
+                try:
+                    exp_dt = datetime.fromisoformat(lic["expires_at"].replace("Z", "+00:00"))
+                    if datetime.now(timezone.utc) > exp_dt:
+                        raise HTTPException(status_code=403, detail="License này đã hết hạn sử dụng. Vui lòng liên hệ để gia hạn.")
+                except Exception as e:
+                    pass
+
+            return {
+                "success": True,
+                "message": "Kích hoạt bản quyền thành công!",
+                "license": lic
+            }
+            
+    raise HTTPException(status_code=404, detail="Mã License Key không tồn tại trên hệ thống.")
+
+@app.get("/auth/license-status")
+def check_license_status(key: str):
+    lics = load_licenses_db()
+    target_key = key.strip().upper()
+    for lic in lics:
+        if lic["license_key"].upper() == target_key:
+            is_expired = False
+            if lic["expires_at"] != "NEVER":
+                from datetime import datetime, timezone
+                try:
+                    exp_dt = datetime.fromisoformat(lic["expires_at"].replace("Z", "+00:00"))
+                    is_expired = datetime.now(timezone.utc) > exp_dt
+                except Exception:
+                    pass
+            return {
+                "valid": lic["is_active"] and not is_expired,
+                "is_active": lic["is_active"],
+                "is_expired": is_expired,
+                "license": lic
+            }
+    return {"valid": False, "reason": "Không tìm thấy key"}
+
+@app.post("/admin/change-password")
+def change_admin_password(req: ChangePasswordRequest):
+    auth_data = get_admin_passwords()
+    username = req.username.strip().lower()
+    current_stored = auth_data.get(username, "123456" if username == "admin" else "12345678")
+    
+    if req.old_password != current_stored:
+        raise HTTPException(status_code=400, detail="Mật khẩu cũ không chính xác!")
+    
+    auth_data[username] = req.new_password
+    save_admin_passwords(auth_data)
+    return {"success": True, "message": "Đổi mật khẩu thành công!"}
+
+# ==========================================================
+# MODULE TÍCH HỢP AI CLOUD BYOK (Veo 3, D-ID, Grok)
+# ==========================================================
+class GrokScriptRequest(BaseModel):
+    api_key: str
+    topic: str
+    style: Optional[str] = "viral"
+
+class DIDAnimateRequest(BaseModel):
+    api_key: str
+    source_url: str
+    script: str
+
+class VeoGenerateRequest(BaseModel):
+    api_key: str
+    prompt: str
+    aspect_ratio: Optional[str] = "16:9"
+
+@app.post("/api/ai/grok-script")
+async def generate_grok_script(req: GrokScriptRequest):
+    import requests
+    headers = {
+        "Authorization": f"Bearer {req.api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "grok-2",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Bạn là chuyên gia biên kịch video ngắn triệu view CapCut / TikTok. Viết kịch bản video ngắn cuốn hút, có hook 3 giây đầu, phân cảnh rõ ràng và prompt hình ảnh để ghép mặt."
+            },
+            {
+                "role": "user",
+                "content": f"Chủ đề video: {req.topic}. Phong cách: {req.style}"
+            }
+        ]
+    }
+    try:
+        res = requests.post("https://api.x.ai/v1/chat/completions", headers=headers, json=payload, timeout=30)
+        if res.status_code == 200:
+            data = res.json()
+            content = data["choices"][0]["message"]["content"]
+            return {"success": True, "script": content}
+        else:
+            return {"success": False, "error": res.text}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/ai/did-animate")
+async def animate_talking_avatar(req: DIDAnimateRequest):
+    import requests
+    headers = {
+        "Authorization": f"Basic {req.api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "source_url": req.source_url,
+        "script": {
+            "type": "text",
+            "subtitles": "false",
+            "provider": { "type": "microsoft", "voice_id": "vi-VN-HoaiMyNeural" },
+            "input": req.script
+        },
+        "config": { "fluent": "false", "pad_audio": "0.0" }
+    }
+    try:
+        res = requests.post("https://api.d-id.com/talks", headers=headers, json=payload, timeout=30)
+        if res.status_code in [200, 201]:
+            return {"success": True, "data": res.json()}
+        else:
+            return {"success": False, "error": res.text}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=False)
+

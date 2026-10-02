@@ -13,9 +13,15 @@ import {
   Clock,
   Layers,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Bot,
+  Film,
+  MessageSquare,
+  Wand2,
+  Settings2
 } from 'lucide-react';
 import { UploadedMedia, DetectedFace, faceSwapApi } from '../../services/faceSwapApi';
+import { db } from '../../services/db';
 
 interface MediaBinZoneProps {
   mediaList: UploadedMedia[];
@@ -34,6 +40,11 @@ interface MediaBinZoneProps {
   onToggleSwapAllFaces: (val: boolean) => void;
   
   isUploading: boolean;
+
+  onOpenAiSettings: () => void;
+  onOpenVeoModal: () => void;
+  onOpenDidModal: () => void;
+  onOpenGrokModal: () => void;
 }
 
 export const MediaBinZone: React.FC<MediaBinZoneProps> = ({
@@ -49,7 +60,11 @@ export const MediaBinZone: React.FC<MediaBinZoneProps> = ({
   onToggleUnifyCharacter,
   swapAllFaces,
   onToggleSwapAllFaces,
-  isUploading
+  isUploading,
+  onOpenAiSettings,
+  onOpenVeoModal,
+  onOpenDidModal,
+  onOpenGrokModal
 }) => {
   const [activeTab, setActiveTab] = useState<'media' | 'faces' | 'settings'>('media');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -143,8 +158,74 @@ export const MediaBinZone: React.FC<MediaBinZoneProps> = ({
             <p className="text-[10px] text-neutral-400 mt-1">Hỗ trợ MP4, MOV, WEBM, JPG, PNG (CPU 100% Offline)</p>
           </div>
 
+          {/* AI Cloud BYOK Action Bar */}
+          <div className="mt-2.5 p-2 bg-[#161824] border border-[#26293a] rounded-xl space-y-1.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-neutral-400 font-medium flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-purple-400" />
+                <span>Tùy Chọn AI Cloud BYOK:</span>
+              </span>
+              <button
+                onClick={onOpenAiSettings}
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold"
+                title="Dán API Key Veo 3 / D-ID / Grok"
+              >
+                <Settings2 className="w-3 h-3" />
+                <span>Cấu hình Key</span>
+              </button>
+            </div>
+
+            {/* Conditional AI Cloud Action Buttons */}
+            <div className="flex flex-col gap-1.5">
+              {db.hasCloudAI('veo') && (
+                <button
+                  onClick={onOpenVeoModal}
+                  className="w-full py-1.5 px-2.5 rounded-lg bg-gradient-to-r from-pink-600/30 to-rose-600/30 hover:from-pink-600/50 hover:to-rose-600/50 border border-pink-500/40 text-pink-200 text-[11px] font-semibold flex items-center justify-between transition-all"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Film className="w-3.5 h-3.5 text-pink-400" />
+                    <span>Tạo video bằng Veo 3</span>
+                  </span>
+                  <span className="text-[9px] bg-pink-500/20 text-pink-300 px-1 py-0.2 rounded font-mono">Google AI</span>
+                </button>
+              )}
+
+              {db.hasCloudAI('did') && (
+                <button
+                  onClick={onOpenDidModal}
+                  className="w-full py-1.5 px-2.5 rounded-lg bg-gradient-to-r from-indigo-600/30 to-purple-600/30 hover:from-indigo-600/50 hover:to-purple-600/50 border border-indigo-500/40 text-indigo-200 text-[11px] font-semibold flex items-center justify-between transition-all"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Tạo avatar nói bằng D-ID</span>
+                  </span>
+                  <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1 py-0.2 rounded font-mono">Talking AI</span>
+                </button>
+              )}
+
+              {db.hasCloudAI('grok') && (
+                <button
+                  onClick={onOpenGrokModal}
+                  className="w-full py-1.5 px-2.5 rounded-lg bg-gradient-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-600/50 hover:to-blue-600/50 border border-cyan-500/40 text-cyan-200 text-[11px] font-semibold flex items-center justify-between transition-all"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Viết kịch bản bằng Grok</span>
+                  </span>
+                  <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 py-0.2 rounded font-mono">xAI</span>
+                </button>
+              )}
+
+              {!db.hasCloudAI('veo') && !db.hasCloudAI('did') && !db.hasCloudAI('grok') && (
+                <div className="text-[10px] text-neutral-400 py-0.5 leading-tight">
+                  Chế độ CPU Offline 100% Miễn phí. Nhập Key để mở tính năng Veo 3 / D-ID / Grok.
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Media Items List */}
-          <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-2">
+          <div className="flex-1 overflow-y-auto mt-2 pr-1 space-y-2">
             {mediaList.length === 0 ? (
               <div className="h-44 flex flex-col items-center justify-center text-center p-4 rounded-xl bg-[#15161e] border border-[#21232c] text-neutral-400">
                 <Video className="w-8 h-8 text-neutral-600 mb-2 opacity-50" />

@@ -6,6 +6,12 @@ import { TimelineZone } from '../components/capcut/TimelineZone';
 import { ExportModal } from '../components/capcut/ExportModal';
 import { InteractiveGuidance, DynamicGuideHUD } from '../components/capcut/InteractiveGuidance';
 import { HotkeysModal } from '../components/capcut/HotkeysModal';
+import { LicenseActivationModal } from '../components/license/LicenseActivationModal';
+import { AIIntegrationsModal } from '../components/ai/AIIntegrationsModal';
+import { GrokScriptGeneratorModal } from '../components/ai/GrokScriptGeneratorModal';
+import { DIDTalkingAvatarModal } from '../components/ai/DIDTalkingAvatarModal';
+import { VeoVideoGeneratorModal } from '../components/ai/VeoVideoGeneratorModal';
+import { db } from '../services/db';
 import { 
   HealthStatus, 
   UploadedMedia, 
@@ -54,6 +60,25 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
+
+  // License & BYOK Cloud AI Modals
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [licenseLockReason, setLicenseLockReason] = useState<string | null>(null);
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [isGrokOpen, setIsGrokOpen] = useState(false);
+  const [isDidOpen, setIsDidOpen] = useState(false);
+  const [isVeoOpen, setIsVeoOpen] = useState(false);
+
+  // Safe Export with License Lock Check
+  const handleRequestExport = () => {
+    const lic = db.checkAppLicense();
+    if (!lic.isLicensed) {
+      setLicenseLockReason(lic.message || 'Bản quyền ứng dụng đã hết hạn hoặc chưa kích hoạt. Vui lòng nhập License Key dạng SY-XXXX-XXXX để mở khóa tính năng Xuất Video.');
+      setIsLicenseModalOpen(true);
+      return;
+    }
+    setIsExportOpen(true);
+  };
 
   // 1. Check Backend Health on mount & poll every 10s
   useEffect(() => {
@@ -217,7 +242,7 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyE') {
         e.preventDefault();
         if (activeMedia && sourceFaceMedia) {
-          setIsExportOpen(true);
+          handleRequestExport();
         }
       }
     };
@@ -233,12 +258,13 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
         health={health}
         projectName={projectName}
         onProjectNameChange={setProjectName}
-        onOpenExport={() => setIsExportOpen(true)}
+        onOpenExport={handleRequestExport}
         onToggleGuide={() => setIsGuideOpen((g) => !g)}
         onToggleHotkeys={() => setIsHotkeysOpen(true)}
         isGuideActive={isGuideOpen}
         canExport={Boolean(activeMedia && sourceFaceMedia)}
         onSwitchView={onSwitchView}
+        onOpenLicense={() => setIsLicenseModalOpen(true)}
       />
 
       {/* Main 3-Zone Workspace */}
@@ -258,6 +284,10 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
           swapAllFaces={swapAllFaces}
           onToggleSwapAllFaces={setSwapAllFaces}
           isUploading={isUploading}
+          onOpenAiSettings={() => setIsAiSettingsOpen(true)}
+          onOpenVeoModal={() => setIsVeoOpen(true)}
+          onOpenDidModal={() => setIsDidOpen(true)}
+          onOpenGrokModal={() => setIsGrokOpen(true)}
         />
 
         {/* Zone 2 (Center): Preview Player with Face Detection Overlay */}
@@ -346,6 +376,54 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
       <HotkeysModal
         isOpen={isHotkeysOpen}
         onClose={() => setIsHotkeysOpen(false)}
+      />
+
+      {/* License Activation Modal (Auto opens when export locked) */}
+      <LicenseActivationModal
+        isOpen={isLicenseModalOpen}
+        onClose={() => setIsLicenseModalOpen(false)}
+        onActivated={() => {
+          setIsLicenseModalOpen(false);
+          setIsExportOpen(true);
+        }}
+        lockReason={licenseLockReason || undefined}
+      />
+
+      {/* AI BYOK Cloud Integrations Modal */}
+      <AIIntegrationsModal
+        isOpen={isAiSettingsOpen}
+        onClose={() => setIsAiSettingsOpen(false)}
+      />
+
+      {/* xAI Grok Script Generator Modal */}
+      <GrokScriptGeneratorModal
+        isOpen={isGrokOpen}
+        onClose={() => setIsGrokOpen(false)}
+        onApplyScript={(script) => {
+          alert('Đã áp dụng kịch bản Grok vào dự án thành công!');
+          setIsGrokOpen(false);
+        }}
+      />
+
+      {/* D-ID Talking Avatar Modal */}
+      <DIDTalkingAvatarModal
+        isOpen={isDidOpen}
+        onClose={() => setIsDidOpen(false)}
+        sourceFaceCrop={sourceFaceCrop}
+        onVideoCreated={(newMedia) => {
+          setMediaList((prev) => [newMedia, ...prev]);
+          handleSelectMedia(newMedia);
+        }}
+      />
+
+      {/* Google Veo 3 Video Generator Modal */}
+      <VeoVideoGeneratorModal
+        isOpen={isVeoOpen}
+        onClose={() => setIsVeoOpen(false)}
+        onVideoCreated={(newMedia) => {
+          setMediaList((prev) => [newMedia, ...prev]);
+          handleSelectMedia(newMedia);
+        }}
       />
     </div>
   );

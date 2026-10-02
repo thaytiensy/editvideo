@@ -5,16 +5,17 @@ import { AdminTemplates } from './AdminTemplates';
 import { AdminUsers } from './AdminUsers';
 import { AdminPricing } from './AdminPricing';
 import { AdminBranding } from './AdminBranding';
+import { AdminLicenses } from './AdminLicenses';
 import { 
   BarChart3, Video, Users, DollarSign, Palette, 
-  ShieldAlert, ShieldCheck, ArrowLeft 
+  ShieldAlert, ShieldCheck, ArrowLeft, KeyRound 
 } from 'lucide-react';
 
 interface AdminLayoutProps {
   onBackToStudio: () => void;
 }
 
-type AdminSubTab = 'overview' | 'templates' | 'users' | 'pricing' | 'branding';
+type AdminSubTab = 'overview' | 'licenses' | 'templates' | 'users' | 'pricing' | 'branding';
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStudio }) => {
   const { currentUser, isAdmin, switchUser, allUsers } = useAuth();
@@ -53,6 +54,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStudio }) => {
   }
 
   const NAV_ITEMS: { key: AdminSubTab; label: string; icon: React.ElementType }[] = [
+    { key: 'licenses', label: 'Bán App & License', icon: KeyRound },
     { key: 'overview', label: 'Tổng Quan & MRR', icon: BarChart3 },
     { key: 'templates', label: 'Video Đã Render', icon: Video },
     { key: 'users', label: 'Người Dùng & Log', icon: Users },
@@ -105,6 +107,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStudio }) => {
       </div>
 
       {/* Subtab Contents */}
+      {subTab === 'licenses' && <AdminLicenses />}
       {subTab === 'overview' && <AdminOverview />}
       {subTab === 'templates' && <AdminTemplates />}
       {subTab === 'users' && <AdminUsers />}

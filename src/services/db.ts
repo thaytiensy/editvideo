@@ -1,5 +1,5 @@
 import { 
-  User, Shop, Template, VideoJob, ShareInvite, AuditLog, PricingConfig, Industry 
+  User, Shop, Template, VideoJob, ShareInvite, AuditLog, PricingConfig, Industry, AppLicense 
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -12,6 +12,9 @@ const STORAGE_KEYS = {
   PRICING: 'avm_pricing',
   CURRENT_USER_ID: 'avm_curr_user_id',
   RATE_LIMITS: 'avm_rate_limits',
+  LICENSES: 'avm_app_licenses',
+  ACTIVE_LICENSE_KEY: 'avm_active_license_key',
+  AI_KEYS: 'avm_ai_cloud_keys',
 };
 
 // Seed 20 templates per industry = 80 templates (4 core commercial industries)
@@ -161,6 +164,20 @@ const INITIAL_SHOPS: Shop[] = [
 
 const INITIAL_USERS: User[] = [
   {
+    id: 'user-admin-root',
+    email: 'admin',
+    phone: '0900000000',
+    name: 'Admin Quản Trị Hệ Thống',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    role: 'ADMIN',
+    plan: 'PRO',
+    shopId: 'shop-zen-1',
+    passwordHash: '123456',
+    videosRenderedCount: 9999,
+    monthlyQuota: 9999,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
     id: 'user-admin-tiensy',
     email: 'thaytiensy@gmail.com',
     phone: '0909000001',
@@ -266,6 +283,45 @@ const INITIAL_AUDIT_LOGS: AuditLog[] = [
   },
 ];
 
+export const INITIAL_LICENSES: AppLicense[] = [
+  {
+    id: 'lic-sy-001',
+    licenseKey: 'SY-VIP9-9999',
+    customerName: 'Thầy Tiến Sỹ (Super Admin)',
+    customerContact: 'thaytiensy@gmail.com',
+    plan: 'LIFETIME',
+    status: 'ACTIVE',
+    maxDevices: 5,
+    expiresAt: 'NEVER',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    notes: 'Key bản quyền vĩnh viễn'
+  },
+  {
+    id: 'lic-sy-002',
+    licenseKey: 'SY-PRO8-8888',
+    customerName: 'Admin Quản Trị Hệ Thống',
+    customerContact: 'admin',
+    plan: 'LIFETIME',
+    status: 'ACTIVE',
+    maxDevices: 5,
+    expiresAt: 'NEVER',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    notes: 'Key bản quyền vĩnh viễn'
+  },
+  {
+    id: 'lic-sy-003',
+    licenseKey: 'SY-DEMO-30DY',
+    customerName: 'Khách Hàng Dùng Thử 30 Ngày',
+    customerContact: 'khachhang@gmail.com',
+    plan: '1_MONTH',
+    status: 'ACTIVE',
+    maxDevices: 1,
+    expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+    createdAt: new Date().toISOString(),
+    notes: 'Gói 1 tháng trải nghiệm'
+  }
+];
+
 // Celebrity and Sensitive filters
 export const CELEBRITY_BLOCKLIST = [
   'elon musk', 'donald trump', 'joe biden', 'taylor swift', 'cristiano ronaldo',
@@ -357,21 +413,23 @@ class DatabaseService {
     return this.getUsers().find((u) => u.phone === phone);
   }
 
-  // Verify credentials for email or phone + password
+  // Verify credentials for email, username or phone + password
   verifyCredentials(emailOrPhone: string, pass: string): { success: boolean; user?: User; error?: string } {
     const term = emailOrPhone.trim().toLowerCase();
     const user = this.getUsers().find(
-      (u) => u.email.toLowerCase() === term || u.phone === emailOrPhone.trim()
+      (u) => u.email.toLowerCase() === term || 
+             u.phone === emailOrPhone.trim() ||
+             (term === 'admin' && (u.email.toLowerCase() === 'admin' || u.role === 'ADMIN'))
     );
     if (!user) {
-      return { success: false, error: 'Không tìm thấy tài khoản với email hoặc số điện thoại này.' };
+      return { success: false, error: 'Không tìm thấy tài khoản với tên đăng nhập hoặc email này.' };
     }
     if (user.isBanned) {
       return { success: false, error: 'Tài khoản của bạn đã bị khóa do vi phạm chính sách.' };
     }
-    const currentPass = user.passwordHash || '12345678';
+    const currentPass = user.passwordHash || (user.email === 'admin' ? '123456' : '12345678');
     if (pass !== currentPass) {
-      return { success: false, error: 'Mật khẩu không chính xác. Mật khẩu mặc định là 12345678.' };
+      return { success: false, error: 'Mật khẩu không chính xác. Mật khẩu mặc định là 123456 cho tài khoản admin.' };
     }
     return { success: true, user };
   }
@@ -675,6 +733,143 @@ class DatabaseService {
     limits[userId] = userTimestamps;
     this.set(STORAGE_KEYS.RATE_LIMITS, limits);
     return { allowed: true };
+  }
+
+  // ==========================================================
+  // MODULE BÁN APP & LICENSE (Định dạng: SY-XXXX-XXXX)
+  // ==========================================================
+  getLicenses(): AppLicense[] {
+    return this.get(STORAGE_KEYS.LICENSES, INITIAL_LICENSES);
+  }
+
+  createLicense(data: { email_or_phone: string; plan?: AppLicense['plan']; duration_days?: number; notes?: string }): AppLicense {
+    const list = this.getLicenses();
+    const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const p2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const key = `SY-${p1}-${p2}`;
+    
+    let expiresAt = 'NEVER';
+    if (data.plan !== 'LIFETIME') {
+      const days = data.duration_days || (data.plan === '1_YEAR' ? 365 : 30);
+      expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+    }
+
+    const newLic: AppLicense = {
+      id: `lic-${Date.now()}`,
+      licenseKey: key,
+      customerName: data.email_or_phone.split('@')[0],
+      customerContact: data.email_or_phone.trim(),
+      plan: data.plan || '1_MONTH',
+      status: 'ACTIVE',
+      maxDevices: 1,
+      expiresAt,
+      createdAt: new Date().toISOString(),
+      notes: data.notes || '',
+    };
+    list.unshift(newLic);
+    this.set(STORAGE_KEYS.LICENSES, list);
+    return newLic;
+  }
+
+  toggleLicense(keyOrId: string): AppLicense {
+    const list = this.getLicenses();
+    const clean = keyOrId.trim().toUpperCase();
+    const idx = list.findIndex(l => l.id === keyOrId || l.licenseKey.toUpperCase() === clean);
+    if (idx === -1) throw new Error('Không tìm thấy License Key');
+    list[idx].status = list[idx].status === 'ACTIVE' ? 'REVOKED' : 'ACTIVE';
+    this.set(STORAGE_KEYS.LICENSES, list);
+    return list[idx];
+  }
+
+  revokeLicense(keyOrId: string): AppLicense {
+    const list = this.getLicenses();
+    const clean = keyOrId.trim().toUpperCase();
+    const idx = list.findIndex(l => l.id === keyOrId || l.licenseKey.toUpperCase() === clean);
+    if (idx === -1) throw new Error('Không tìm thấy License Key');
+    list[idx].status = 'REVOKED';
+    this.set(STORAGE_KEYS.LICENSES, list);
+    return list[idx];
+  }
+
+  deleteLicense(keyOrId: string): void {
+    const clean = keyOrId.trim().toUpperCase();
+    const list = this.getLicenses().filter(l => l.id !== keyOrId && l.licenseKey.toUpperCase() !== clean);
+    this.set(STORAGE_KEYS.LICENSES, list);
+  }
+
+  getActiveLicenseKey(): string {
+    return this.get(STORAGE_KEYS.ACTIVE_LICENSE_KEY, 'SY-VIP9-9999');
+  }
+
+  setActiveLicenseKey(key: string): void {
+    this.set(STORAGE_KEYS.ACTIVE_LICENSE_KEY, key.trim().toUpperCase());
+  }
+
+  checkAppLicense(): { isLicensed: boolean; plan?: string; expiresAt?: string; message?: string; key?: string } {
+    const activeKey = this.getActiveLicenseKey();
+    if (!activeKey) {
+      return { isLicensed: false, message: 'Chưa kích hoạt bản quyền ứng dụng' };
+    }
+    const list = this.getLicenses();
+    const lic = list.find(l => l.licenseKey.toUpperCase() === activeKey.toUpperCase());
+    if (!lic) {
+      return { isLicensed: false, message: 'Mã bản quyền không tồn tại' };
+    }
+    if (lic.status === 'REVOKED') {
+      return { isLicensed: false, message: 'Bản quyền đã bị khóa hoặc thu hồi bởi Quản trị viên' };
+    }
+    if (lic.expiresAt !== 'NEVER') {
+      const exp = new Date(lic.expiresAt).getTime();
+      if (Date.now() > exp) {
+        return { isLicensed: false, message: 'Bản quyền ứng dụng đã hết hạn sử dụng' };
+      }
+    }
+    return { isLicensed: true, plan: lic.plan, expiresAt: lic.expiresAt, message: 'Bản quyền hợp lệ', key: lic.licenseKey };
+  }
+
+  activateLicense(key: string): { success: boolean; license?: AppLicense; error?: string } {
+    const cleanKey = key.trim().toUpperCase();
+    const list = this.getLicenses();
+    const lic = list.find(l => l.licenseKey.toUpperCase() === cleanKey);
+    if (!lic) {
+      return { success: false, error: 'Mã License Key không tồn tại. Định dạng chuẩn: SY-XXXX-XXXX' };
+    }
+    if (lic.status === 'REVOKED') {
+      return { success: false, error: 'License này đã bị thu hồi hoặc khóa bởi Quản trị viên.' };
+    }
+    if (lic.expiresAt !== 'NEVER') {
+      const exp = new Date(lic.expiresAt).getTime();
+      if (Date.now() > exp) {
+        return { success: false, error: 'License này đã hết hạn sử dụng. Vui lòng liên hệ để gia hạn.' };
+      }
+    }
+    this.setActiveLicenseKey(cleanKey);
+    return { success: true, license: lic };
+  }
+
+  // ==========================================================
+  // MODULE TÍCH HỢP AI CLOUD BYOK (Veo 3, D-ID, Grok)
+  // ==========================================================
+  getAICloudKeys(): { veoApiKey: string; didApiKey: string; grokApiKey: string } {
+    return this.get(STORAGE_KEYS.AI_KEYS, {
+      veoApiKey: '',
+      didApiKey: '',
+      grokApiKey: '',
+    });
+  }
+
+  saveAICloudKeys(keys: { veoApiKey?: string; didApiKey?: string; grokApiKey?: string }): void {
+    const current = this.getAICloudKeys();
+    const updated = { ...current, ...keys };
+    this.set(STORAGE_KEYS.AI_KEYS, updated);
+  }
+
+  hasCloudAI(type: 'veo' | 'did' | 'grok'): boolean {
+    const keys = this.getAICloudKeys();
+    if (type === 'veo') return Boolean(keys.veoApiKey && keys.veoApiKey.trim().length > 5);
+    if (type === 'did') return Boolean(keys.didApiKey && keys.didApiKey.trim().length > 5);
+    if (type === 'grok') return Boolean(keys.grokApiKey && keys.grokApiKey.trim().length > 5);
+    return false;
   }
 }
 

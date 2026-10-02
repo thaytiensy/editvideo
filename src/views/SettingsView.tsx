@@ -4,8 +4,10 @@ import { useBrand } from '../context/BrandContext';
 import { useGemini } from '../context/GeminiContext';
 import { 
   User, Lock, UploadCloud, CheckCircle2, AlertCircle, Shield, 
-  Building2, Key, ExternalLink, Eye, EyeOff 
+  Building2, Key, ExternalLink, Eye, EyeOff, KeyRound, Sparkles,
+  Video, Bot, MessageSquare, ShieldCheck, Zap
 } from 'lucide-react';
+import { db } from '../services/db';
 
 export const SettingsView: React.FC = () => {
   const { currentUser, updateProfile, updatePassword } = useAuth();
@@ -215,6 +217,12 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
+      {/* App License Management Card */}
+      <LicenseSettingsInlineCard />
+
+      {/* Cloud AI BYOK Integrations Card (Veo 3, D-ID, Grok) */}
+      <AICloudIntegrationsInlineCard />
+
       {/* Gemini AI & Model Settings Card */}
       <GeminiSettingsInlineCard />
     </div>
@@ -378,3 +386,265 @@ const GeminiSettingsInlineCard: React.FC = () => {
     </div>
   );
 };
+
+// ==========================================================
+// LICENSE MANAGEMENT INLINE CARD
+// ==========================================================
+const LicenseSettingsInlineCard: React.FC = () => {
+  const [licStatus, setLicStatus] = useState(db.checkAppLicense());
+  const [keyInput, setKeyInput] = useState('');
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const refreshStatus = () => {
+    setLicStatus(db.checkAppLicense());
+  };
+
+  const handleActivate = (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+    const cleanKey = keyInput.trim().toUpperCase();
+    if (!cleanKey) {
+      setMsg({ type: 'error', text: 'Vui lòng nhập License Key (dạng SY-XXXX-XXXX)' });
+      return;
+    }
+
+    const res = db.activateLicense(cleanKey);
+    if (res.success && res.license) {
+      setMsg({ type: 'success', text: `Kích hoạt thành công gói ${res.license.plan}!` });
+      setKeyInput('');
+      refreshStatus();
+    } else {
+      setMsg({ type: 'error', text: res.error || 'Mã bản quyền không hợp lệ hoặc đã bị vô hiệu hóa.' });
+    }
+  };
+
+  const formatDate = (isoString?: string) => {
+    if (!isoString || isoString === 'NEVER') return 'Vĩnh Viễn (Lifetime)';
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  return (
+    <div className="bg-[#10131d] border border-neutral-800 rounded-2xl p-6 shadow-xl space-y-5">
+      <div className="border-b border-neutral-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-amber-400" />
+            <span>Quản Lý Bản Quyền Ứng Dụng (SY-XXXX-XXXX)</span>
+          </h3>
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Giấy phép bản quyền mở khóa đầy đủ tính năng Xuất Video độ phân giải cao và tính năng Pro
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {licStatus.isLicensed ? (
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Đã Kích Hoạt ({licStatus.plan})</span>
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Chưa Có Bản Quyền / Hết Hạn</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Info Box */}
+        <div className="p-4 bg-[#141829] border border-neutral-800 rounded-xl space-y-2 text-xs">
+          <div className="flex justify-between items-center text-neutral-300">
+            <span className="text-neutral-400">License hiện tại:</span>
+            <span className="font-mono font-bold text-indigo-300">{licStatus.key || 'Chưa kích hoạt'}</span>
+          </div>
+          <div className="flex justify-between items-center text-neutral-300">
+            <span className="text-neutral-400">Thời hạn sử dụng:</span>
+            <span className="font-medium text-white">{formatDate(licStatus.expiresAt)}</span>
+          </div>
+          <div className="flex justify-between items-center text-neutral-300">
+            <span className="text-neutral-400">Trạng thái Export:</span>
+            <span className={licStatus.isLicensed ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
+              {licStatus.isLicensed ? "Đã mở khóa toàn bộ" : "Bị khóa (Cần kích hoạt)"}
+            </span>
+          </div>
+        </div>
+
+        {/* Activation Form */}
+        <form onSubmit={handleActivate} className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value.toUpperCase())}
+              placeholder="Nhập SY-XXXX-XXXX..."
+              className="flex-1 bg-[#151928] border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white font-mono outline-none focus:border-amber-500 uppercase"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-bold rounded-xl text-xs transition-colors shadow-sm"
+            >
+              Kích Hoạt
+            </button>
+          </div>
+          {msg && (
+            <div className={`p-2 rounded-xl text-xs flex items-center gap-2 ${
+              msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' : 'bg-red-950/40 text-red-300 border border-red-500/40'
+            }`}>
+              {msg.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+              <span>{msg.text}</span>
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================================
+// AI CLOUD BYOK INTEGRATIONS INLINE CARD
+// ==========================================================
+const AICloudIntegrationsInlineCard: React.FC = () => {
+  const [keys, setKeys] = useState(db.getAICloudKeys());
+  const [veoInput, setVeoInput] = useState(keys.veoApiKey || '');
+  const [didInput, setDidInput] = useState(keys.didApiKey || '');
+  const [grokInput, setGrokInput] = useState(keys.grokApiKey || '');
+  const [showVeo, setShowVeo] = useState(false);
+  const [showDid, setShowDid] = useState(false);
+  const [showGrok, setShowGrok] = useState(false);
+  const [savedMsg, setSavedMsg] = useState(false);
+
+  const handleSaveKeys = (e: React.FormEvent) => {
+    e.preventDefault();
+    db.saveAICloudKeys({
+      veoApiKey: veoInput.trim(),
+      didApiKey: didInput.trim(),
+      grokApiKey: grokInput.trim(),
+    });
+    setKeys(db.getAICloudKeys());
+    setSavedMsg(true);
+    setTimeout(() => setSavedMsg(false), 3000);
+  };
+
+  return (
+    <div className="bg-[#10131d] border border-neutral-800 rounded-2xl p-6 shadow-xl space-y-5">
+      <div className="border-b border-neutral-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>Tích Hợp AI Cloud BYOK (Veo 3, D-ID, Grok)</span>
+          </h3>
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Nhập API Key của bạn để mở khóa các nút tạo video điện ảnh, MC nói chuyện và kịch bản viral. Nếu không có key, app vẫn chạy 100% Offline trên CPU.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSaveKeys} className="space-y-4">
+        {/* Veo 3 */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-neutral-300 flex items-center gap-2">
+              <Video className="w-3.5 h-3.5 text-pink-400" />
+              <span>Google Veo 3 API Key (Video Điện Ảnh AI)</span>
+            </label>
+            <span className="text-[10px] font-mono text-neutral-500">Google AI Studio</span>
+          </div>
+          <div className="relative">
+            <input
+              type={showVeo ? 'text' : 'password'}
+              value={veoInput}
+              onChange={(e) => setVeoInput(e.target.value)}
+              placeholder="AIzaSy... (Để trống nếu chỉ dùng Offline)"
+              className="w-full bg-[#151928] border border-neutral-800 rounded-xl pl-3 pr-10 py-2.5 text-xs text-white font-mono outline-none focus:border-pink-500"
+            />
+            <button
+              type="button"
+              onClick={() => setShowVeo(!showVeo)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+            >
+              {showVeo ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* D-ID */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-neutral-300 flex items-center gap-2">
+              <Bot className="w-3.5 h-3.5 text-indigo-400" />
+              <span>D-ID / Daking API Key (MC Avatar Khẩu Hình)</span>
+            </label>
+            <span className="text-[10px] font-mono text-neutral-500">studio.d-id.com</span>
+          </div>
+          <div className="relative">
+            <input
+              type={showDid ? 'text' : 'password'}
+              value={didInput}
+              onChange={(e) => setDidInput(e.target.value)}
+              placeholder="d-id-key... (Để trống nếu chỉ dùng Offline)"
+              className="w-full bg-[#151928] border border-neutral-800 rounded-xl pl-3 pr-10 py-2.5 text-xs text-white font-mono outline-none focus:border-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={() => setShowDid(!showDid)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+            >
+              {showDid ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Grok */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-neutral-300 flex items-center gap-2">
+              <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+              <span>xAI Grok API Key (Kịch Bản Hook Triệu View)</span>
+            </label>
+            <span className="text-[10px] font-mono text-neutral-500">x.ai/api</span>
+          </div>
+          <div className="relative">
+            <input
+              type={showGrok ? 'text' : 'password'}
+              value={grokInput}
+              onChange={(e) => setGrokInput(e.target.value)}
+              placeholder="xai-... (Để trống nếu chỉ dùng Offline)"
+              className="w-full bg-[#151928] border border-neutral-800 rounded-xl pl-3 pr-10 py-2.5 text-xs text-white font-mono outline-none focus:border-cyan-500"
+            />
+            <button
+              type="button"
+              onClick={() => setShowGrok(!showGrok)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+            >
+              {showGrok ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {savedMsg && (
+          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Đã lưu thành công các API Key đám mây!</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className="w-full py-2.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+        >
+          Lưu Cài Đặt AI Cloud (BYOK)
+        </button>
+      </form>
+    </div>
+  );
+};
+

@@ -10,9 +10,11 @@ import {
   CheckCircle2, 
   AlertCircle,
   Layers,
-  Wand2
+  Wand2,
+  KeyRound
 } from 'lucide-react';
 import { HealthStatus } from '../../services/faceSwapApi';
+import { db } from '../../services/db';
 
 interface CapcutHeaderProps {
   health: HealthStatus | null;
@@ -24,6 +26,7 @@ interface CapcutHeaderProps {
   isGuideActive: boolean;
   canExport: boolean;
   onSwitchView?: () => void;
+  onOpenLicense?: () => void;
 }
 
 export const CapcutHeader: React.FC<CapcutHeaderProps> = ({
@@ -34,8 +37,11 @@ export const CapcutHeader: React.FC<CapcutHeaderProps> = ({
   onToggleGuide,
   onToggleHotkeys,
   isGuideActive,
-  canExport
+  canExport,
+  onSwitchView,
+  onOpenLicense
 }) => {
+  const lic = db.checkAppLicense();
   return (
     <header className="h-14 bg-[#14151a] border-b border-[#23252e] px-4 flex items-center justify-between select-none z-30">
       {/* Brand & Project Info */}
@@ -111,6 +117,23 @@ export const CapcutHeader: React.FC<CapcutHeaderProps> = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-2">
+        {/* License Status & Activation Trigger */}
+        {onOpenLicense && (
+          <button
+            onClick={onOpenLicense}
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              lic.isLicensed
+                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                : 'bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30 animate-pulse'
+            }`}
+            title={lic.isLicensed ? `Bản quyền ${lic.plan} hợp lệ. Click để xem chi tiết.` : 'Bản quyền chưa kích hoạt hoặc hết hạn! Click để nhập key.'}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>{lic.isLicensed ? `License: ${lic.plan}` : 'Kích Hoạt Key'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${lic.isLicensed ? 'bg-emerald-400' : 'bg-red-400'}`} />
+          </button>
+        )}
+
         {/* Switch to Web Hub / Admin if desired */}
         {onSwitchView && (
           <button
