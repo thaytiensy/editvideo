@@ -10,9 +10,9 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-# Ensure CPU only
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-os.environ["ONNXRUNTIME_EXECUTION_PROVIDERS"] = "CPUExecutionProvider"
+# Ensure CUDA / GPU environment variables can be utilized dynamically
+if "CUDA_VISIBLE_DEVICES" in os.environ and os.environ["CUDA_VISIBLE_DEVICES"] == "-1":
+    del os.environ["CUDA_VISIBLE_DEVICES"]
 
 import cv2
 import numpy as np
@@ -23,9 +23,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import base64
 
-# Try importing insightface
-import insightface
-from insightface.app import FaceAnalysis
+# Import Advanced FaceSwap Pro AI Engine
+from backend.face_engine import (
+    InsightFaceProEngine,
+    FaceTrackerEMA,
+    CachedSourceEmbedding,
+    compute_cosine_similarity,
+    estimate_affine_similarity,
+    generate_feather_mask
+)
 
 app = FastAPI(title="FaceSwap Pro Video Editor Backend", version="2.0.0")
 
@@ -86,31 +92,20 @@ SWAPPER_PATH = MODELS_DIR / "inswapper_128.onnx"
 print(f"[*] Using Models directory: {MODELS_DIR}")
 print(f"[*] Using Swapper path: {SWAPPER_PATH}")
 
-# Global model holders
-face_analyzer: Optional[FaceAnalysis] = None
-face_swapper: Optional[Any] = None
+# Global Enterprise Face Engine
+pro_engine: Optional[InsightFaceProEngine] = None
 model_lock = threading.Lock()
 
 def init_models():
-    global face_analyzer, face_swapper
+    global pro_engine
     with model_lock:
-        if face_analyzer is None:
-            print("[*] Loading FaceAnalysis (buffalo_l, CPU)...")
+        if pro_engine is None:
+            print("[*] Initializing InsightFaceProEngine (buffalo_l + inswapper_128)...")
             try:
-                # Buffalo_l root is MODELS_DIR
-                face_analyzer = FaceAnalysis(name="buffalo_l", root=str(MODELS_DIR), providers=["CPUExecutionProvider"])
-                face_analyzer.prepare(ctx_id=0, det_size=(320, 320))
-                print("[OK] FaceAnalysis loaded.")
+                pro_engine = InsightFaceProEngine(MODELS_DIR)
+                print(f"[OK] InsightFaceProEngine ready with providers: {pro_engine.providers}")
             except Exception as e:
-                print(f"[!] Error loading FaceAnalysis: {e}")
-
-        if face_swapper is None and SWAPPER_PATH.exists():
-            print("[*] Loading INSWAPPER model (CPU)...")
-            try:
-                face_swapper = insightface.model_zoo.get_model(str(SWAPPER_PATH), providers=["CPUExecutionProvider"])
-                print("[OK] INSWAPPER loaded.")
-            except Exception as e:
-                print(f"[!] Error loading INSWAPPER: {e}")
+                print(f"[!] Error loading InsightFaceProEngine: {e}")
 
 # Run init in background or on start
 threading.Thread(target=init_models, daemon=True).start()
@@ -172,12 +167,14 @@ class ExportVideoRequest(BaseModel):
 # API Endpoints
 @app.get("/api/health")
 def health():
+    providers = pro_engine.providers if pro_engine else []
     return {
         "status": "online",
-        "cpu_only": True,
+        "cpu_only": "CUDAExecutionProvider" not in providers,
+        "providers": providers,
         "models_dir": str(MODELS_DIR),
-        "analyzer_ready": face_analyzer is not None,
-        "swapper_ready": face_swapper is not None,
+        "analyzer_ready": pro_engine is not None and pro_engine.app is not None,
+        "swapper_ready": pro_engine is not None and pro_engine.swapper is not None,
         "ffmpeg_path": FFMPEG_PATH,
         "ffmpeg_exists": os.path.exists(FFMPEG_PATH)
     }
@@ -241,7 +238,7 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/api/detect-faces")
 def detect_faces(req: DetectFacesRequest):
     init_models()
-    if face_analyzer is None:
+    if pro_engine is None or pro_engine.app is None:
         raise HTTPException(status_code=503, detail="Face detection model is still initializing. Please retry in a few seconds.")
 
     file_path = Path(req.file_path)
@@ -269,17 +266,13 @@ def detect_faces(req: DetectFacesRequest):
 
     h, w = frame.shape[:2]
 
-    # Run face detection
+    # Run face detection via pro_engine
     with model_lock:
-        faces = face_analyzer.get(frame)
+        faces = pro_engine.detect_faces(frame)
 
     result_faces = []
-    # Sort faces left-to-right
-    faces = sorted(faces, key=lambda f: f.bbox[0])
-
     for idx, face in enumerate(faces):
         bbox = [float(x) for x in face.bbox]
-        # Crop face thumbnail
         crop = crop_face(frame, bbox)
         crop_thumb = ""
         if crop.size > 0:
@@ -291,7 +284,7 @@ def detect_faces(req: DetectFacesRequest):
 
         result_faces.append({
             "index": idx,
-            "bbox": bbox, # [x1, y1, x2, y2]
+            "bbox": bbox,
             "normalized_bbox": [bbox[0]/w, bbox[1]/h, bbox[2]/w, bbox[3]/h],
             "landmarks": landmarks,
             "det_score": float(face.det_score) if hasattr(face, "det_score") else 1.0,
@@ -300,9 +293,7 @@ def detect_faces(req: DetectFacesRequest):
             "thumbnail": crop_thumb
         })
 
-    # Generate frame preview with bounding boxes
     preview_thumb = image_to_base64_jpeg(frame, quality=80)
-
     return {
         "face_count": len(result_faces),
         "faces": result_faces,
@@ -314,7 +305,7 @@ def detect_faces(req: DetectFacesRequest):
 @app.post("/api/swap-preview")
 def swap_preview(req: SwapPreviewRequest):
     init_models()
-    if face_analyzer is None or face_swapper is None:
+    if pro_engine is None or not pro_engine.is_ready():
         raise HTTPException(status_code=503, detail="Models are initializing. Please wait.")
 
     source_path = Path(req.source_image_path)
@@ -325,13 +316,12 @@ def swap_preview(req: SwapPreviewRequest):
     if source_img is None:
         raise HTTPException(status_code=400, detail="Invalid source image")
 
+    # Cache source embedding once
     with model_lock:
-        source_faces = face_analyzer.get(source_img)
+        cached_source = pro_engine.get_source_cache(source_img)
 
-    if not source_faces:
+    if cached_source is None:
         raise HTTPException(status_code=400, detail="No face detected in source replacement image")
-
-    source_face = source_faces[0]
 
     # Target frame extraction
     target_frame = None
@@ -355,18 +345,17 @@ def swap_preview(req: SwapPreviewRequest):
         raise HTTPException(status_code=400, detail="Could not load target frame")
 
     with model_lock:
-        target_faces = face_analyzer.get(target_frame)
+        target_faces = pro_engine.detect_faces(target_frame)
 
     if not target_faces:
         raise HTTPException(status_code=400, detail="No face detected in target frame")
 
-    target_faces = sorted(target_faces, key=lambda f: f.bbox[0])
     selected_idx = req.target_face_index if (req.target_face_index is not None and req.target_face_index < len(target_faces)) else 0
     chosen_face = target_faces[selected_idx]
 
-    # Perform swap
+    # Perform precision swap with skimage SimilarityTransform & 25px Feather Blur
     with model_lock:
-        swapped_frame = face_swapper.get(target_frame, chosen_face, source_face, paste_back=True)
+        swapped_frame = pro_engine.swap_face_core(target_frame, chosen_face.kps, cached_source, enhance=True)
 
     result_b64 = image_to_base64_jpeg(swapped_frame, quality=85)
     return {
@@ -390,15 +379,14 @@ def run_video_export(job_id: str, req: ExportVideoRequest):
             jobs_db[job_id]["error"] = "Input files do not exist"
             return
 
-        # Read source face
+        # Cache source replacement face embedding ONCE (Single-Pass Caching)
         src_img = cv2.imread(str(s_path))
         with model_lock:
-            src_faces = face_analyzer.get(src_img)
-        if not src_faces:
+            cached_source = pro_engine.get_source_cache(src_img)
+        if cached_source is None:
             jobs_db[job_id]["status"] = "failed"
-            jobs_db[job_id]["error"] = "No face found in source image"
+            jobs_db[job_id]["error"] = "No face found in source replacement image"
             return
-        source_face = src_faces[0]
 
         cap = cv2.VideoCapture(str(v_path))
         orig_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -430,21 +418,23 @@ def run_video_export(job_id: str, req: ExportVideoRequest):
         # Target reference embedding for tracking/unifying character across scenes
         target_ref_embedding = None
         if req.target_face_index is not None and req.target_face_index >= 0:
-            # Detect reference face from start frame
             ret, first_frame = cap.read()
             if ret and first_frame is not None:
                 with model_lock:
-                    ff_faces = face_analyzer.get(first_frame)
-                ff_faces = sorted(ff_faces, key=lambda f: f.bbox[0])
+                    ff_faces = pro_engine.detect_faces(first_frame)
                 if req.target_face_index < len(ff_faces):
-                    target_ref_embedding = ff_faces[req.target_face_index].embedding
+                    target_face_obj = ff_faces[req.target_face_index]
+                    target_ref_embedding = getattr(target_face_obj, "normed_embedding", getattr(target_face_obj, "embedding", None))
             cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+        # Initialize EMA Smoothing Tracker for Bounding Box and 5 Landmarks
+        tracker = FaceTrackerEMA(alpha=0.70)
 
         # Setup temp raw video path
         temp_raw_video = EXPORT_DIR / f"temp_{job_id}.mp4"
         final_output = EXPORT_DIR / f"export_{job_id}_{req.resolution or '1080p'}.mp4"
 
-        # OpenCV VideoWriter for swapped frames (we write in original frame size or target size)
+        # OpenCV VideoWriter for swapped frames
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(temp_raw_video), fourcc, orig_fps, (orig_width, orig_height))
 
@@ -464,37 +454,41 @@ def run_video_export(job_id: str, req: ExportVideoRequest):
             if not ret or frame is None:
                 break
 
-            # Face swap
+            # Face detection for current frame
             with model_lock:
-                frame_faces = face_analyzer.get(frame)
+                frame_faces = pro_engine.detect_faces(frame)
 
             if frame_faces:
-                # Decide which faces to swap
                 if req.target_face_index == -1:
-                    # Swap ALL detected faces
+                    # Swap ALL detected faces with precision feather mask blur 25px
                     for f in frame_faces:
                         with model_lock:
-                            frame = face_swapper.get(frame, f, source_face, paste_back=True)
+                            frame = pro_engine.swap_face_core(frame, f.kps, cached_source, enhance=True)
                 elif target_ref_embedding is not None and req.unify_character:
-                    # Match by cosine similarity to reference face
+                    # Robust Auto-Tracking: match by cosine similarity + EMA smoothing
                     best_face = None
                     best_sim = -1.0
                     for f in frame_faces:
-                        sim = compute_similarity(f.embedding, target_ref_embedding)
+                        f_emb = getattr(f, "normed_embedding", getattr(f, "embedding", None))
+                        sim = compute_cosine_similarity(f_emb, target_ref_embedding)
                         if sim > best_sim:
                             best_sim = sim
                             best_face = f
-                    # Threshold for same character
+
                     if best_face is not None and best_sim > 0.35:
+                        smooth_bbox, smooth_kps = tracker.update(best_face.bbox, best_face.kps)
                         with model_lock:
-                            frame = face_swapper.get(frame, best_face, source_face, paste_back=True)
+                            frame = pro_engine.swap_face_core(frame, smooth_kps, cached_source, enhance=True)
+                    else:
+                        tracker.mark_lost()
                 else:
-                    # Fallback to index if available
-                    frame_faces = sorted(frame_faces, key=lambda f: f.bbox[0])
+                    # Fallback to chosen index with EMA smoothing
                     idx = req.target_face_index or 0
                     if idx < len(frame_faces):
+                        chosen = frame_faces[idx]
+                        smooth_bbox, smooth_kps = tracker.update(chosen.bbox, chosen.kps)
                         with model_lock:
-                            frame = face_swapper.get(frame, frame_faces[idx], source_face, paste_back=True)
+                            frame = pro_engine.swap_face_core(frame, smooth_kps, cached_source, enhance=True)
 
             writer.write(frame)
             processed_count += 1
