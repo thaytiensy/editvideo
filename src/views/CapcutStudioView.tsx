@@ -6,6 +6,8 @@ import { TimelineZone } from '../components/capcut/TimelineZone';
 import { ExportModal } from '../components/capcut/ExportModal';
 import { InteractiveGuidance, DynamicGuideHUD } from '../components/capcut/InteractiveGuidance';
 import { HotkeysModal } from '../components/capcut/HotkeysModal';
+import { ImageToVideoModal } from '../components/capcut/ImageToVideoModal';
+import { MergeVideosModal } from '../components/capcut/MergeVideosModal';
 import { LicenseActivationModal } from '../components/license/LicenseActivationModal';
 import { AIIntegrationsModal } from '../components/ai/AIIntegrationsModal';
 import { GrokScriptGeneratorModal } from '../components/ai/GrokScriptGeneratorModal';
@@ -68,6 +70,12 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
   const [isGrokOpen, setIsGrokOpen] = useState(false);
   const [isDidOpen, setIsDidOpen] = useState(false);
   const [isVeoOpen, setIsVeoOpen] = useState(false);
+
+  // Video Editing & AI Image-To-Video Modals
+  const [isImageToVideoOpen, setIsImageToVideoOpen] = useState(false);
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+  const [isSplittingClip, setIsSplittingClip] = useState(false);
+  const [isTrimmingClip, setIsTrimmingClip] = useState(false);
 
   // Safe Export with License Lock Check
   const handleRequestExport = () => {
@@ -211,7 +219,61 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
     }
   };
 
-  // 8. Keyboard Shortcuts
+  // 8. Split Video Clip at current playhead
+  const handleSplitClip = async () => {
+    if (!activeMedia || activeMedia.type !== 'video') {
+      alert('Vui lòng chọn một video để cắt');
+      return;
+    }
+    if (currentTime <= 0.1 || currentTime >= duration - 0.1) {
+      alert('Vui lòng di chuyển đầu đọc vào bên trong video (cách đầu và cuối ít nhất 0.1s)');
+      return;
+    }
+
+    try {
+      setIsSplittingClip(true);
+      const res = await faceSwapApi.splitVideo({
+        video_path: activeMedia.file_path,
+        timestamp: currentTime,
+      });
+      // Add both parts to media bin, replacing the original or keeping them all
+      setMediaList((prev) => [res.part2, res.part1, ...prev]);
+      handleSelectMedia(res.part1);
+    } catch (err: any) {
+      alert(`Lỗi khi cắt clip: ${err.message}`);
+    } finally {
+      setIsSplittingClip(false);
+    }
+  };
+
+  // 9. Trim Video Clip between In and Out points
+  const handleTrimClip = async () => {
+    if (!activeMedia || activeMedia.type !== 'video') {
+      alert('Vui lòng chọn một video để trích đoạn');
+      return;
+    }
+    if (outPoint <= inPoint) {
+      alert('Điểm kết thúc (Out) phải lớn hơn điểm bắt đầu (In)');
+      return;
+    }
+
+    try {
+      setIsTrimmingClip(true);
+      const res = await faceSwapApi.trimVideo({
+        video_path: activeMedia.file_path,
+        start_time: inPoint,
+        end_time: outPoint,
+      });
+      setMediaList((prev) => [res, ...prev]);
+      handleSelectMedia(res);
+    } catch (err: any) {
+      alert(`Lỗi khi trích đoạn clip: ${err.message}`);
+    } finally {
+      setIsTrimmingClip(false);
+    }
+  };
+
+  // 10. Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input
@@ -224,7 +286,7 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
         setIsPlaying((p) => !p);
       } else if (e.code === 'KeyS') {
         e.preventDefault();
-        setInPoint(currentTime);
+        handleSplitClip();
       } else if (e.code === 'KeyI' || e.key === '[') {
         e.preventDefault();
         setInPoint(currentTime);
@@ -288,6 +350,8 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
           onOpenVeoModal={() => setIsVeoOpen(true)}
           onOpenDidModal={() => setIsDidOpen(true)}
           onOpenGrokModal={() => setIsGrokOpen(true)}
+          onOpenImageToVideo={() => setIsImageToVideoOpen(true)}
+          onOpenMergeModal={() => setIsMergeModalOpen(true)}
         />
 
         {/* Zone 2 (Center): Preview Player with Face Detection Overlay */}
@@ -344,6 +408,11 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
         sourceFaceCrop={sourceFaceCrop}
         unifyCharacter={unifyCharacter}
         swapAllFaces={swapAllFaces}
+        onSplitClip={handleSplitClip}
+        onTrimClip={handleTrimClip}
+        onOpenMerge={() => setIsMergeModalOpen(true)}
+        isSplitting={isSplittingClip}
+        isTrimming={isTrimmingClip}
       />
 
       {/* Export Modal (720p, 1080p, 2k, 4k, 8k) */}
@@ -421,6 +490,30 @@ export const CapcutStudioView: React.FC<{ onSwitchView?: () => void }> = ({ onSw
         isOpen={isVeoOpen}
         onClose={() => setIsVeoOpen(false)}
         onVideoCreated={(newMedia) => {
+          setMediaList((prev) => [newMedia, ...prev]);
+          handleSelectMedia(newMedia);
+        }}
+      />
+
+      {/* Offline Image-To-Video AI Animator Modal */}
+      <ImageToVideoModal
+        isOpen={isImageToVideoOpen}
+        onClose={() => setIsImageToVideoOpen(false)}
+        mediaList={mediaList}
+        sourceFaceMedia={sourceFaceMedia}
+        sourceFaceCrop={sourceFaceCrop}
+        onVideoCreated={(newMedia) => {
+          setMediaList((prev) => [newMedia, ...prev]);
+          handleSelectMedia(newMedia);
+        }}
+      />
+
+      {/* Merge Video Clips Modal */}
+      <MergeVideosModal
+        isOpen={isMergeModalOpen}
+        onClose={() => setIsMergeModalOpen(false)}
+        mediaList={mediaList}
+        onMerged={(newMedia) => {
           setMediaList((prev) => [newMedia, ...prev]);
           handleSelectMedia(newMedia);
         }}

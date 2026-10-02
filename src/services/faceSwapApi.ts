@@ -147,4 +147,69 @@ export const faceSwapApi = {
   getDownloadUrl(filename: string): string {
     return `${API_BASE_URL}/api/download/${filename}`;
   },
+
+  async trimVideo(params: {
+    video_path: string;
+    start_time: number;
+    end_time: number;
+  }): Promise<UploadedMedia> {
+    const res = await fetch(`${API_BASE_URL}/api/video/trim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Trim failed' }));
+      throw new Error(err.detail || 'Trim failed');
+    }
+    return await res.json();
+  },
+
+  async splitVideo(params: {
+    video_path: string;
+    timestamp: number;
+  }): Promise<{ status: string; part1: UploadedMedia; part2: UploadedMedia }> {
+    const res = await fetch(`${API_BASE_URL}/api/video/split`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Split failed' }));
+      throw new Error(err.detail || 'Split failed');
+    }
+    return await res.json();
+  },
+
+  async mergeVideos(params: { video_paths: string[] }): Promise<UploadedMedia> {
+    const res = await fetch(`${API_BASE_URL}/api/video/merge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Merge failed' }));
+      throw new Error(err.detail || 'Merge failed');
+    }
+    return await res.json();
+  },
+
+  async imageToVideo(params: {
+    image_path: string;
+    source_face_path?: string;
+    motion_style?: string;
+    duration?: number;
+    fps?: number;
+  }): Promise<UploadedMedia> {
+    const res = await fetch(`${API_BASE_URL}/api/image-to-video`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Image-To-Video failed' }));
+      throw new Error(err.detail || 'Image-To-Video failed');
+    }
+    return await res.json();
+  },
 };

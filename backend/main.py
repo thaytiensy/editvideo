@@ -611,6 +611,305 @@ def download_export(filename: str):
     return FileResponse(str(target), media_type="video/mp4", filename=filename)
 
 # ==========================================================
+# MODULE CẮT GHÉP VIDEO PRO (TRIM, SPLIT, MERGE)
+# ==========================================================
+class TrimVideoRequest(BaseModel):
+    video_path: str
+    start_time: float
+    end_time: float
+
+class SplitVideoRequest(BaseModel):
+    video_path: str
+    timestamp: float
+
+class MergeVideosRequest(BaseModel):
+    video_paths: List[str]
+
+@app.post("/api/video/trim")
+def trim_video(req: TrimVideoRequest):
+    v_path = Path(req.video_path)
+    if not v_path.exists():
+        raise HTTPException(status_code=404, detail="Video file not found")
+    
+    duration = req.end_time - req.start_time
+    if duration <= 0:
+        raise HTTPException(status_code=400, detail="Invalid trim range: end_time must be greater than start_time")
+
+    out_name = f"trim_{uuid.uuid4().hex[:8]}_{v_path.name}"
+    out_path = EXPORT_DIR / out_name
+
+    cmd = [
+        FFMPEG_PATH, "-y",
+        "-ss", str(req.start_time),
+        "-i", str(v_path),
+        "-t", str(duration),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:a", "aac", "-b:a", "192k",
+        "-avoid_negative_ts", "make_zero",
+        str(out_path)
+    ]
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if not out_path.exists():
+        raise HTTPException(status_code=500, detail="FFmpeg trim error")
+
+    cap = cv2.VideoCapture(str(out_path))
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS)) or 30.0
+    fc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    ret, frame = cap.read()
+    thumb = image_to_base64_jpeg(frame, 70) if (ret and frame is not None) else ""
+    cap.release()
+
+    return {
+        "file_id": out_name,
+        "filename": out_name,
+        "file_path": str(out_path.resolve()),
+        "url": f"/exports/{out_name}",
+        "type": "video",
+        "duration": round(duration, 2),
+        "fps": fps,
+        "frame_count": fc,
+        "width": w,
+        "height": h,
+        "thumbnail": thumb
+    }
+
+@app.post("/api/video/split")
+def split_video(req: SplitVideoRequest):
+    v_path = Path(req.video_path)
+    if not v_path.exists():
+        raise HTTPException(status_code=404, detail="Video file not found")
+
+    cap = cv2.VideoCapture(str(v_path))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    total_duration = total_frames / fps if fps > 0 else 10.0
+    cap.release()
+
+    if req.timestamp <= 0.1 or req.timestamp >= total_duration - 0.1:
+        raise HTTPException(status_code=400, detail="Split point must be strictly inside video duration")
+
+    part1_name = f"split_p1_{uuid.uuid4().hex[:6]}_{v_path.name}"
+    part2_name = f"split_p2_{uuid.uuid4().hex[:6]}_{v_path.name}"
+    p1_path = EXPORT_DIR / part1_name
+    p2_path = EXPORT_DIR / part2_name
+
+    # Part 1: 0 -> timestamp
+    cmd1 = [
+        FFMPEG_PATH, "-y",
+        "-ss", "0", "-i", str(v_path),
+        "-t", str(req.timestamp),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:a", "aac",
+        "-avoid_negative_ts", "make_zero",
+        str(p1_path)
+    ]
+    subprocess.run(cmd1, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # Part 2: timestamp -> end
+    cmd2 = [
+        FFMPEG_PATH, "-y",
+        "-ss", str(req.timestamp), "-i", str(v_path),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:a", "aac",
+        "-avoid_negative_ts", "make_zero",
+        str(p2_path)
+    ]
+    subprocess.run(cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    return {
+        "status": "success",
+        "part1": {
+            "file_id": part1_name,
+            "filename": part1_name,
+            "file_path": str(p1_path.resolve()),
+            "url": f"/exports/{part1_name}",
+            "type": "video",
+            "duration": round(req.timestamp, 2)
+        },
+        "part2": {
+            "file_id": part2_name,
+            "filename": part2_name,
+            "file_path": str(p2_path.resolve()),
+            "url": f"/exports/{part2_name}",
+            "type": "video",
+            "duration": round(total_duration - req.timestamp, 2)
+        }
+    }
+
+@app.post("/api/video/merge")
+def merge_videos(req: MergeVideosRequest):
+    if not req.video_paths or len(req.video_paths) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 video paths are required to merge")
+
+    valid_paths = [Path(p) for p in req.video_paths if Path(p).exists()]
+    if len(valid_paths) < 2:
+        raise HTTPException(status_code=400, detail="Some videos do not exist on disk")
+
+    concat_file = EXPORT_DIR / f"concat_{uuid.uuid4().hex[:8]}.txt"
+    merged_name = f"merged_{uuid.uuid4().hex[:8]}.mp4"
+    merged_path = EXPORT_DIR / merged_name
+
+    with open(concat_file, "w", encoding="utf-8") as f:
+        for vp in valid_paths:
+            escaped = str(vp.resolve()).replace("\\", "/")
+            f.write(f"file '{escaped}'\n")
+
+    cmd = [
+        FFMPEG_PATH, "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(concat_file),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:a", "aac",
+        str(merged_path)
+    ]
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if concat_file.exists():
+        concat_file.unlink()
+
+    if not merged_path.exists():
+        raise HTTPException(status_code=500, detail="FFmpeg failed to merge videos")
+
+    cap = cv2.VideoCapture(str(merged_path))
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS)) or 30.0
+    fc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = fc / fps if fps > 0 else 10.0
+    ret, frame = cap.read()
+    thumb = image_to_base64_jpeg(frame, 70) if (ret and frame is not None) else ""
+    cap.release()
+
+    return {
+        "file_id": merged_name,
+        "filename": merged_name,
+        "file_path": str(merged_path.resolve()),
+        "url": f"/exports/{merged_name}",
+        "type": "video",
+        "duration": round(duration, 2),
+        "fps": fps,
+        "frame_count": fc,
+        "width": w,
+        "height": h,
+        "thumbnail": thumb
+    }
+
+# ==========================================================
+# MODULE TẠO VIDEO ĐỔI MẶT TỪ ẢNH TĨNH (IMAGE-TO-VIDEO ANIMATOR)
+# ==========================================================
+class ImageToVideoRequest(BaseModel):
+    image_path: str
+    source_face_path: Optional[str] = None
+    motion_style: Optional[str] = "ken_burns"  # "ken_burns", "breathing", "parallax_pan", "dolly_zoom"
+    duration: Optional[float] = 6.0
+    fps: Optional[int] = 30
+
+@app.post("/api/image-to-video")
+def image_to_video(req: ImageToVideoRequest):
+    init_models()
+    img_path = Path(req.image_path)
+    if not img_path.exists():
+        raise HTTPException(status_code=404, detail="Target image not found")
+
+    target_img = cv2.imread(str(img_path))
+    if target_img is None:
+        raise HTTPException(status_code=400, detail="Could not read image file")
+
+    # Step 1: Swap face if source face is provided
+    if req.source_face_path:
+        src_path = Path(req.source_face_path)
+        if src_path.exists():
+            src_img = cv2.imread(str(src_path))
+            if src_img is not None:
+                cached_src = pro_engine.get_source_cache(src_img)
+                if cached_src:
+                    t_faces = pro_engine.detect_faces(target_img)
+                    if t_faces:
+                        target_img = pro_engine.swap_face_core(target_img, t_faces[0].kps, cached_src, enhance=True)
+
+    # Step 2: Generate dynamic video motion from image
+    h, w = target_img.shape[:2]
+    out_w, out_h = (1080, 1920) if h > w else (1920, 1080)
+    resized_base = cv2.resize(target_img, (out_w, out_h), interpolation=cv2.INTER_LANCZOS4)
+
+    fps = req.fps or 30
+    duration = max(3.0, min(15.0, req.duration or 6.0))
+    total_frames = int(duration * fps)
+
+    temp_video = EXPORT_DIR / f"anim_raw_{uuid.uuid4().hex[:8]}.mp4"
+    final_video = EXPORT_DIR / f"anim_{req.motion_style}_{uuid.uuid4().hex[:8]}.mp4"
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(temp_video), fourcc, fps, (out_w, out_h))
+
+    style = req.motion_style or "ken_burns"
+
+    for i in range(total_frames):
+        t = i / total_frames  # 0.0 -> 1.0
+
+        if style == "ken_burns":
+            scale = 1.0 + 0.22 * (t ** 1.2)
+            shift_x = int(out_w * 0.04 * np.sin(t * np.pi))
+            shift_y = int(out_h * 0.03 * t)
+        elif style == "breathing":
+            breath = np.sin(2.0 * np.pi * (t * duration) / 2.2)
+            scale = 1.02 + 0.02 * breath
+            shift_x = 0
+            shift_y = int(4 * breath)
+        elif style == "parallax_pan":
+            scale = 1.15
+            shift_x = int(out_w * 0.10 * (t - 0.5))
+            shift_y = 0
+        else: # dolly_zoom
+            scale = 1.0 + 0.28 * (np.sin(t * np.pi) ** 1.5)
+            shift_x = 0
+            shift_y = int(out_h * 0.02 * np.cos(t * np.pi))
+
+        cx, cy = out_w / 2.0, out_h / 2.0
+        M = cv2.getRotationMatrix2D((cx, cy), 0, scale)
+        M[0, 2] += shift_x
+        M[1, 2] += shift_y
+
+        frame = cv2.warpAffine(resized_base, M, (out_w, out_h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+        writer.write(frame)
+
+    writer.release()
+
+    # Step 3: FFmpeg remux to standard H.264
+    cmd = [
+        FFMPEG_PATH, "-y",
+        "-i", str(temp_video),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-pix_fmt", "yuv420p",
+        str(final_video)
+    ]
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if temp_video.exists():
+        temp_video.unlink()
+
+    cap = cv2.VideoCapture(str(final_video))
+    ret, first_f = cap.read()
+    cap.release()
+    thumb = image_to_base64_jpeg(first_f, 75) if (ret and first_f is not None) else ""
+
+    return {
+        "file_id": final_video.name,
+        "filename": final_video.name,
+        "file_path": str(final_video.resolve()),
+        "url": f"/exports/{final_video.name}",
+        "type": "video",
+        "duration": duration,
+        "fps": fps,
+        "frame_count": total_frames,
+        "width": out_w,
+        "height": out_h,
+        "thumbnail": thumb,
+        "motion_style": style
+    }
+
+# ==========================================================
 # MODULE BÁN APP & LICENSE (SY-XXXX-XXXX)
 # ==========================================================
 LICENSES_FILE = BASE_DIR / "backend" / "licenses.json"

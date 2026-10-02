@@ -12,7 +12,9 @@ import {
   Sliders,
   RotateCcw,
   Check,
-  UserCheck
+  UserCheck,
+  Combine,
+  Split
 } from 'lucide-react';
 import { UploadedMedia, DetectedFace } from '../../services/faceSwapApi';
 
@@ -31,6 +33,11 @@ interface TimelineZoneProps {
   sourceFaceCrop: string | null;
   unifyCharacter: boolean;
   swapAllFaces: boolean;
+  onSplitClip?: () => void;
+  onTrimClip?: () => void;
+  onOpenMerge?: () => void;
+  isSplitting?: boolean;
+  isTrimming?: boolean;
 }
 
 export const TimelineZone: React.FC<TimelineZoneProps> = ({
@@ -47,7 +54,12 @@ export const TimelineZone: React.FC<TimelineZoneProps> = ({
   detectedFaces,
   sourceFaceCrop,
   unifyCharacter,
-  swapAllFaces
+  swapAllFaces,
+  onSplitClip,
+  onTrimClip,
+  onOpenMerge,
+  isSplitting,
+  isTrimming
 }) => {
   const [zoom, setZoom] = useState(1); // 1x to 5x zoom
   const trackRef = useRef<HTMLDivElement>(null);
@@ -110,21 +122,19 @@ export const TimelineZone: React.FC<TimelineZoneProps> = ({
         <div className="flex items-center gap-2">
           {/* Split Tool */}
           <button
-            onClick={() => {
-              // Set in/out point around playhead
-              onSetInPoint(currentTime);
-            }}
-            className="px-2.5 py-1 rounded bg-[#1c1e28] hover:bg-[#252836] text-neutral-300 hover:text-white border border-[#2b2e3e] flex items-center gap-1.5 transition-colors"
-            title="Tách clip / Cắt đoạn tại đầu đọc (S)"
+            onClick={onSplitClip}
+            disabled={!activeMedia || isSplitting || currentTime <= 0.1 || currentTime >= duration - 0.1}
+            className="px-2.5 py-1 rounded bg-[#1c1e28] hover:bg-[#252836] text-neutral-300 hover:text-white border border-[#2b2e3e] flex items-center gap-1.5 transition-colors disabled:opacity-40"
+            title="Cắt đôi clip hiện tại tại đầu đọc thành 2 phần riêng biệt (Split ✂️)"
           >
             <Scissors className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Cắt Tại Đầu Đọc (S)</span>
+            <span>{isSplitting ? 'Đang cắt...' : 'Cắt Đôi Clip (S)'}</span>
           </button>
 
           {/* Mark In */}
           <button
             onClick={() => onSetInPoint(currentTime)}
-            className="px-2.5 py-1 rounded bg-[#1c1e28] hover:bg-[#252836] text-neutral-300 hover:text-white border border-[#2b2e3e] flex items-center gap-1 transition-colors"
+            className="px-2 py-1 rounded bg-[#1c1e28] hover:bg-[#252836] text-neutral-300 hover:text-white border border-[#2b2e3e] flex items-center gap-1 transition-colors"
             title="Chọn điểm bắt đầu hoán đổi (I)"
           >
             <span>[ Đặt In</span>
@@ -133,11 +143,24 @@ export const TimelineZone: React.FC<TimelineZoneProps> = ({
           {/* Mark Out */}
           <button
             onClick={() => onSetOutPoint(currentTime)}
-            className="px-2.5 py-1 rounded bg-[#1c1e28] hover:bg-[#252836] text-neutral-300 hover:text-white border border-[#2b2e3e] flex items-center gap-1 transition-colors"
+            className="px-2 py-1 rounded bg-[#1c1e28] hover:bg-[#252836] text-neutral-300 hover:text-white border border-[#2b2e3e] flex items-center gap-1 transition-colors"
             title="Chọn điểm kết thúc hoán đổi (O)"
           >
             <span>Đặt Out ]</span>
           </button>
+
+          {/* Trim In-Out Tool */}
+          {(inPoint > 0 || outPoint < duration) && (
+            <button
+              onClick={onTrimClip}
+              disabled={!activeMedia || isTrimming || (outPoint - inPoint <= 0)}
+              className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/40 flex items-center gap-1.5 transition-colors disabled:opacity-40"
+              title="Trích xuất đoạn từ In đến Out thành clip mới (Trim)"
+            >
+              <Scissors className="w-3.5 h-3.5 text-amber-400" />
+              <span>{isTrimming ? 'Đang trích...' : 'Trích Đoạn In-Out'}</span>
+            </button>
+          )}
 
           {/* Reset In/Out */}
           {(inPoint > 0 || outPoint < duration) && (
@@ -147,9 +170,19 @@ export const TimelineZone: React.FC<TimelineZoneProps> = ({
               title="Khôi phục toàn bộ độ dài video"
             >
               <RotateCcw className="w-3 h-3" />
-              <span>Toàn bộ video</span>
+              <span>Toàn bộ</span>
             </button>
           )}
+
+          {/* Merge Videos Modal Trigger */}
+          <button
+            onClick={onOpenMerge}
+            className="px-2.5 py-1 rounded bg-[#1c1e28] hover:bg-[#252836] text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 flex items-center gap-1.5 transition-colors"
+            title="Ghép nhiều video lại thành 1 video liền mạch"
+          >
+            <Combine className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Ghép Video 🔗</span>
+          </button>
         </div>
 
         {/* Center: Selected Character Status */}

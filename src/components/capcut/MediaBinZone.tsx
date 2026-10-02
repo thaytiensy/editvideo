@@ -45,6 +45,8 @@ interface MediaBinZoneProps {
   onOpenVeoModal: () => void;
   onOpenDidModal: () => void;
   onOpenGrokModal: () => void;
+  onOpenImageToVideo?: () => void;
+  onOpenMergeModal?: () => void;
 }
 
 export const MediaBinZone: React.FC<MediaBinZoneProps> = ({
@@ -64,7 +66,9 @@ export const MediaBinZone: React.FC<MediaBinZoneProps> = ({
   onOpenAiSettings,
   onOpenVeoModal,
   onOpenDidModal,
-  onOpenGrokModal
+  onOpenGrokModal,
+  onOpenImageToVideo,
+  onOpenMergeModal
 }) => {
   const [activeTab, setActiveTab] = useState<'media' | 'faces' | 'settings'>('media');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +160,27 @@ export const MediaBinZone: React.FC<MediaBinZoneProps> = ({
               {isUploading ? "Đang xử lý tải lên..." : "Kéo thả hoặc Click để nạp video"}
             </p>
             <p className="text-[10px] text-neutral-400 mt-1">Hỗ trợ MP4, MOV, WEBM, JPG, PNG (CPU 100% Offline)</p>
+          </div>
+
+          {/* Quick Offline AI Video Editing Actions */}
+          <div className="grid grid-cols-2 gap-2 mt-2.5">
+            <button
+              onClick={onOpenImageToVideo}
+              className="p-2 rounded-xl bg-gradient-to-r from-purple-600/25 to-indigo-600/25 hover:from-purple-600/40 hover:to-indigo-600/40 border border-purple-500/40 text-purple-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+              title="Tạo video chuyển động điện ảnh & đổi mặt từ ảnh tĩnh"
+            >
+              <Wand2 className="w-3.5 h-3.5 text-purple-400" />
+              <span>Tạo Video Từ Ảnh</span>
+            </button>
+
+            <button
+              onClick={onOpenMergeModal}
+              className="p-2 rounded-xl bg-[#181b26] hover:bg-[#202434] border border-[#2c3144] hover:border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+              title="Ghép các video clip lại thành 1 video liền mạch"
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Ghép Video 🔗</span>
+            </button>
           </div>
 
           {/* AI Cloud BYOK Action Bar */}
