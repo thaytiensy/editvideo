@@ -10,6 +10,10 @@ Write-Host "====================================================================
 $CurrentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $CurrentDir
 
+# Set PATH for Rust & MinGW toolchain
+$mingwBin = "C:\Users\win 10 pro\AppData\Local\Microsoft\WinGet\Packages\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\llvm-mingw-20260616-ucrt-x86_64\bin"
+$env:Path = "$mingwBin;C:\Users\win 10 pro\.cargo\bin;" + $env:Path
+
 # 1. Start Python FastAPI backend if not already running on port 8000
 $portActive = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
 if (-not $portActive) {
